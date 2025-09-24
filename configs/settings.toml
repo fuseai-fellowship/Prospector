@@ -3,3 +3,7 @@ dynaconf_merge = true
 [default]
 app_name = "{{ prospector}}"
 DATABASE_URL = "sqlite:///default.db"
+
+[default.logging]
+log_level = "INFO"
+log_format = "%(asctime)s | %(levelname)s | %(message)s"
