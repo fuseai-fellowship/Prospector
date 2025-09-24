@@ -1,0 +1,5 @@
+dynaconf_merge = true
+
+[default]
+app_name = "{{ prospector}}"
+DATABASE_URL = "sqlite:///default.db"
