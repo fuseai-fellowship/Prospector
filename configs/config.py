@@ -3,7 +3,7 @@ import logging
 
 # Load settings
 settings = Dynaconf(
-    settings_files=["configs/settings.toml", "configs/.secrets.toml"],
+    settings_files=["configs/settings.toml"],
     envvar_prefix="DYNACONF",
     load_dotenv=True,
 )

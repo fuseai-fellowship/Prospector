@@ -19,7 +19,7 @@ class SturResumeExtractor:
         self.model = model
 
     def extract(self, resume_text: str) -> dict:
-        prompt = f"""
+        stur_resume_prompt = f"""
             Extract structured JSON data from the following resume text:
             {resume_text}
 
@@ -80,7 +80,7 @@ class SturResumeExtractor:
         """
 
         logger.info(f"Extracting Structured Resume Data through {self.model} ")
-        response = self.llm.invoke(prompt)
+        response = self.llm.invoke(stur_resume_prompt)
         structured_resume = response.content
         logger.info("Extraction of Strucutred Resume Successful")
         try:

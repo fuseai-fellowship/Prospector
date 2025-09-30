@@ -8,6 +8,7 @@ dependencies = [
     "docx2txt>=0.9",
     "dotenv>=0.9.9",
     "dynaconf>=3.2.11",
+    "langchain>=0.3.27",
     "langchain-google-genai>=2.1.12",
     "pdfplumber>=0.11.7",
     "ruff>=0.13.1",

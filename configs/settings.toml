@@ -1,8 +1,7 @@
-dynaconf_merge = true
-
 [default]
-app_name = "{{ prospector}}"
-DATABASE_URL = "sqlite:///default.db"
+app_name = "prospector"
+database_url = "sqlite:///default.db"
+normal_model = "gemini-2.5-flash"
 
 [default.logging]
 log_level = "INFO"
