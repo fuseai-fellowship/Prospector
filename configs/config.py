@@ -1,11 +1,17 @@
 from dynaconf import Dynaconf
 import logging
+from pathlib import Path
 
-# Load settings
+# Get the directory where config.py is located
+_BASE_PATH = Path(__file__).parent.parent
+_CONFIG_PATH = _BASE_PATH / "configs"
+
+# Load settings with absolute path
 settings = Dynaconf(
-    settings_files=["configs/settings.toml"],
+    settings_files=[str(_CONFIG_PATH / "settings.toml")],
     envvar_prefix="DYNACONF",
     load_dotenv=True,
+    environments=True,  # Enable environment support
 )
 
 # Safely get logging settings with defaults

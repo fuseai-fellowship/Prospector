@@ -19,7 +19,6 @@ class JdResumeProcessorAgent:
             self.pipeline = RunnableSequence(
                 self._get_text_resume,
                 self._extract_resume_data,
-                self.process_jd,
             )
 
     def _get_text_resume(self, _input=None) -> str:

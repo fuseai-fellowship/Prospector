@@ -11,11 +11,18 @@ class LLMClient:
     def __init__(
         self,
         model=None,
-        temperature=0.0,
+        temperature=None,
         use_history=False,
     ):
         if model is None:
-            model = settings.get("normal_model")
+            self.model = settings.get("normal_model")
+        else:
+            self.model = model
+
+        if temperature is None:
+            self.temperature = settings.get("temperature")
+        else:
+            self.model = temperature
 
         api_key = os.getenv("GOOGLE_API_KEY")
 
@@ -23,47 +30,26 @@ class LLMClient:
             raise ValueError("GOOGLE_API_KEY not found in environment variables")
 
         self.llm = ChatGoogleGenerativeAI(
-            model=model,
-            temperature=temperature,
+            model=self.model,
+            temperature=self.temperature,
             api_key=api_key,
         )
         self.use_history = use_history
         self.history = [] if use_history else None
 
-    def ask(self, prompt: str) -> str:
+    def invoke(self, prompt: str) -> str:
         """Send a prompt to the LLM. Optionally maintain chat history."""
         if self.use_history:
             self.history.append(HumanMessage(content=prompt))
             response = self.llm.invoke(self.history)
             self.history.append(response)
+            print(self.history)
         else:
             response = self.llm.invoke(prompt)
 
-        return response.content
+        return response.content if hasattr(response, "content") else str(response)
 
     def _reset_history(self):
         """Clear conversation history if enabled."""
         if self.use_history:
             self.history = []
-
-
-if __name__ == "__main__":
-    # Initialize the client
-    client = LLMClient(model=settings.normal_model, temperature=0.7, use_history=True)
-
-    print("Welcome to LLMClient. Type 'exit' to quit or 'reset' to clear history.")
-
-    while True:
-        user_input = input("You: ")
-
-        if user_input.lower() == "exit":
-            print("Exiting...")
-            break
-        elif user_input.lower() == "reset":
-            client._reset_history()
-            print("History cleared.")
-            continue
-
-        # Get LLM response
-        response = client.ask(user_input)
-        print(f"LLM: {response}")
