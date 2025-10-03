@@ -3,7 +3,7 @@ from pathlib import Path
 from src.agents.jd_resume_processor_agent import JdResumeProcessorAgent
 from src.utils.llm_client import LLMClient
 from configs.config import settings
-from src.tools.question_generator import QuestionGenerator
+from src.tools.question_generator import QuestionAnswerGenerator
 
 
 def main():
@@ -11,7 +11,7 @@ def main():
     agent = JdResumeProcessorAgent(resume_path=resume_path)
     result = agent.process_resume()
 
-    qn_gen = QuestionGenerator()
+    qn_gen = QuestionAnswerGenerator()
     jd = """
         Job Description (JD)
 

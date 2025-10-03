@@ -10,7 +10,7 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 
-class QuestionGenerator:
+class QuestionAnswerGenerator:
     def __init__(self, model=None, temperature=None):
         self.llm = LLMClient(
             model=model,
@@ -85,3 +85,12 @@ class QuestionGenerator:
         except Exception as e:
             logger.error(f"Error generating interview questions: {e}")
             return None
+
+    def generateFollowupQuestion(self, chat_history):
+        logger.info("Generating Followup Questions")
+
+        return None
+
+    def generateAnswer(self, questions):
+        logger.info("Generating Answers for Interview Questions")
+        return None
