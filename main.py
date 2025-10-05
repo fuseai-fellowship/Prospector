@@ -3,7 +3,7 @@ from pathlib import Path
 from src.agents.jd_resume_processor_agent import JdResumeProcessorAgent
 from src.utils.llm_client import LLMClient
 from configs.config import settings
-from src.tools.question_generator import QuestionAnswerGenerator
+from src.tools.question_answer_generator import QuestionAnswerGenerator
 
 
 def main():
@@ -85,8 +85,10 @@ def main():
         Communication style focused on clarity, simplicity, and actionable insights.
         """
 
-    questions = qn_gen.generateInterviewQuestion(resume_json=result, job_description=jd)
-    print(questions)
+    questions = qn_gen.generateInterviewQuestion(
+        resume_json=result,
+        job_description=jd,
+    )
 
 
 if __name__ == "__main__":

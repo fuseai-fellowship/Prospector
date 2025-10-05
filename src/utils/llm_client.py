@@ -1,8 +1,13 @@
+import os
+
+from dotenv import load_dotenv
+from typing import Type
+from pydantic import BaseModel
+
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage
-from dotenv import load_dotenv
+
 from configs.config import settings
-import os
 
 load_dotenv()
 
@@ -48,6 +53,24 @@ class LLMClient:
             response = self.llm.invoke(prompt)
 
         return response.content if hasattr(response, "content") else str(response)
+
+    def get_structured_response(
+        self,
+        prompt: str,
+        schema: Type[BaseModel],
+    ) -> BaseModel:
+        structured_llm = self.llm.with_structured_output(schema)
+
+        if self.use_history:
+            from langchain.schema import HumanMessage
+
+            self.history.append(HumanMessage(content=prompt))
+            response = structured_llm.invoke(self.history)
+            self.history.append(response)
+        else:
+            response = structured_llm.invoke(prompt)
+
+        return response
 
     def _reset_history(self):
         """Clear conversation history if enabled."""
