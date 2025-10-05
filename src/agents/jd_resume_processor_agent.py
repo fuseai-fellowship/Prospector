@@ -1,6 +1,6 @@
 from langchain_core.runnables import RunnableSequence
 from ..tools.stur_resume_extractor import SturResumeExtractor
-from ..utils.parse_resume import parse_resume
+from ..utils.resume_parser import parse_resume
 
 
 class JdResumeProcessorAgent:
