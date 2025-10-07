@@ -18,9 +18,13 @@ class LLMClient:
         model=None,
         temperature=None,
         use_history=False,
+        use_resoning_model=False,
     ):
         if model is None:
-            self.model = settings.get("normal_model")
+            if use_resoning_model:
+                self.model = settings.get("resoning_model")
+            else:
+                self.model = settings.get("normal_model")
         else:
             self.model = model
 

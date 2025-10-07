@@ -2,8 +2,8 @@ import os
 from dotenv import load_dotenv
 
 from configs.config import logger, settings
-from src.utils.llm_client import LLMClient
-from src.schemas.resume_schema import ResumeSchema
+from ..utils.llm_client import LLMClient
+from ..schemas.resume_schema import ResumeSchema
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")

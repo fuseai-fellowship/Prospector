@@ -4,6 +4,7 @@ from src.agents.jd_resume_processor_agent import JdResumeProcessorAgent
 from src.utils.llm_client import LLMClient
 from configs.config import settings
 from src.tools.question_answer_generator import QuestionAnswerGenerator
+from src.tools.evaluation_tool import EvaluationTool
 
 
 def main():
@@ -85,10 +86,17 @@ def main():
         Communication style focused on clarity, simplicity, and actionable insights.
         """
 
-    questions = qn_gen.generateInterviewQuestion(
+    questions = qn_gen.generateInterviewQnAns(
         resume_json=result,
         job_description=jd,
     )
+
+    answer = """
+            [QuestionItem(id=1, question="In your 'Ghar-Tution' project, what specific roles did PHP and SQL play in the application's functionality?", target_concepts=['PHP', 'SQL'], difficulty='Easy', answer="The php was used mostly for the backend and logic side programming and sql for storing tutions data")
+            """
+
+    res = EvaluationTool()._run(user_answer=questions)
+    print(res)
 
 
 if __name__ == "__main__":

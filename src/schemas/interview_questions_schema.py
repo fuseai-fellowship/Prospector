@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 
 class QuestionItem(BaseModel):
@@ -7,6 +7,7 @@ class QuestionItem(BaseModel):
     question: str
     target_concepts: List[str]
     difficulty: Literal["Easy", "Medium", "Hard"]
+    answer: Optional[str] = None
 
 
 class InterviewQuestionsSchema(BaseModel):

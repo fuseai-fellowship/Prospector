@@ -2,6 +2,7 @@
 app_name = "prospector"
 database_url = "sqlite:///default.db"
 normal_model = "gemini-2.5-flash"
+resoning_model = "gemini-2.5-pro"
 temperature = 0.0
 
 [default.logging]
