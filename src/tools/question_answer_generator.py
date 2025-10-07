@@ -1,3 +1,5 @@
+import random
+
 from configs.config import logger
 from ..utils.llm_client import LLMClient
 from ..schemas.interview_questions_schema import InterviewQuestionsSchema
@@ -11,16 +13,19 @@ class QuestionAnswerGenerator:
             use_resoning_model=True,
         )
 
-    def generateInterviewQnAns(self, resume_json: str, job_description: str):
+    def generateInterviewQnAns(
+        self, resume_json: str, job_description: str, no_of_qn: int = 9
+    ) -> InterviewQuestionsSchema:
+        per_cat_qn = no_of_qn / 3
         prompt = f"""
             You are an interviewer preparing 15 short-answer technical questions for a candidate.
             Use ONLY the pasted candidate resume and job description as source.
 
             INSTRUCTIONS:
-            1. Produce exactly 9 questions grouped into three sections:
-            - resume_questions (3 questions)
-            - jd_questions (3 questions)
-            - mixed_questions (3 questions)
+            1. Produce exactly {no_of_qn} questions grouped into three sections:
+            - resume_questions ({per_cat_qn} questions)
+            - jd_questions ({per_cat_qn} questions)
+            - mixed_questions ({per_cat_qn} questions)
             2. Order each section's questions from Easy → Medium → Hard.
             3. Each question must:
             - Be phrased naturally as if spoken by an interviewer.

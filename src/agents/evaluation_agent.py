@@ -7,20 +7,26 @@ from ..tools.followup_question_tool import FollowUpQuestionTool
 
 
 class EvaluationAgent:
-    def __init__(self, model=None, temperature=None):
-        self.llm = LLMClient()
-
-        self.evaluation_tool = AnswerEvaluationTool()
-        self.followup_question_tool = FollowUpQuestionTool()
+    def __init__(self, chat_history_name: str, model=None, temperature=None):
+        self.evaluation_tool = AnswerEvaluationTool(
+            model=model, temperature=temperature
+        )
+        self.followup_question_tool = FollowUpQuestionTool(
+            model=model, temperature=temperature
+        )
         self.memory = ConversationBufferMemory(
-            memory_key="chat_history", return_messages=True
+            memory_key=chat_history_name, return_messages=True
         )
         self.tools = [self.evaluation_tool, self.followup_question_tool]
 
-        self.agent = initialize_agent(
-            tools=self.tools,
-            llm=self.llm,
-            agent_type=AgentType.OPENAI_FUNCTIONS,
-            memory=self.memory,
-            verbose=True,
-        )
+    def run(self, user_answer, jd, chat_history):
+        eval_result = self.evaluation_tool._run(user_answer)
+        need_followup: bool = eval_result.follow_up_status
+
+        if need_followup:
+            followup_questions = self.followup_question_tool._run(
+                user_answer, jd, chat_history
+            )
+            return eval_result, followup_questions
+        else:
+            return eval_result, False

@@ -30,6 +30,7 @@ class AnswerEvaluationTool(BaseTool):
                     Completeness: Does the answer cover all important aspects of the question without leaving major gaps?
 
                     Provide a short overall assessment (1 sentences).
+                    Alse decide whether this requires followup question or not. Also If the users doesn't know the answer then keep it false
                     Here is user_answer[{user_answer}]
                 """
         try:
