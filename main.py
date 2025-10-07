@@ -4,7 +4,7 @@ from src.agents.jd_resume_processor_agent import JdResumeProcessorAgent
 from src.utils.llm_client import LLMClient
 from configs.config import settings
 from src.tools.question_answer_generator import QuestionAnswerGenerator
-from src.tools.evaluation_tool import EvaluationTool
+from tools.answer_evaluation_tool import AnswerEvaluationTool
 
 
 def main():
@@ -95,7 +95,7 @@ def main():
             [QuestionItem(id=1, question="In your 'Ghar-Tution' project, what specific roles did PHP and SQL play in the application's functionality?", target_concepts=['PHP', 'SQL'], difficulty='Easy', answer="The php was used mostly for the backend and logic side programming and sql for storing tutions data")
             """
 
-    res = EvaluationTool()._run(user_answer=questions)
+    res = AnswerEvaluationTool()._run(user_answer=questions)
     print(res)
 
 

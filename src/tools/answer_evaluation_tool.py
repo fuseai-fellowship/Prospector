@@ -6,7 +6,7 @@ from ..schemas.evaluation_schema import AnswerEvaluation
 from ..utils.llm_client import LLMClient
 
 
-class EvaluationTool(BaseTool):
+class AnswerEvaluationTool(BaseTool):
     name: str = "AnswerEvaluator"
     description: str = "A LangChain tool that assesses interview answers by scoring relevance, clarity, depth, accuracy, and completeness, and provides a concise overall assessment of the candidate’s understanding."
     _llm: LLMClient = PrivateAttr()
@@ -18,7 +18,7 @@ class EvaluationTool(BaseTool):
             temperature=temperature,
         )
 
-    def _run(self, user_answer):
+    def _run(self, user_answer) -> AnswerEvaluation:
         prompt = f"""
                     Evaluate Understanding: Check if the candidate’s answer demonstrates a clear understanding of the question and sufficiently addresses the target concepts.
                     Score the Answer across the following categories (each rated 1–5, where 1 = very poor and 5 = excellent):

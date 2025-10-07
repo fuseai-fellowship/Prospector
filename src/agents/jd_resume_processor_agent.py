@@ -4,8 +4,10 @@ from ..utils.resume_parser import parse_resume
 
 
 class JdResumeProcessorAgent:
-    def __init__(self, resume_path: str, job_description: str = None):
-        self.resume_path = resume_path
+    def __init__(
+        self,
+        job_description: str = None,
+    ):
         self.extractor = SturResumeExtractor()
 
         if job_description:
@@ -13,7 +15,7 @@ class JdResumeProcessorAgent:
             self.pipeline = RunnableSequence(
                 self._get_text_resume,
                 self._extract_resume_data,
-                self.process_jd,
+                self._process_jd,
             )
         else:
             self.pipeline = RunnableSequence(
@@ -21,16 +23,22 @@ class JdResumeProcessorAgent:
                 self._extract_resume_data,
             )
 
-    def _get_text_resume(self, _input=None) -> str:
-        return parse_resume(self.resume_path)
-
-    def _extract_resume_data(self, resume_text: str):
-        return self.extractor.extract(resume_text)
-
-    def process_resume(self) -> dict:
-        result = self.pipeline.invoke(self.resume_path)
+    def run(self, resume_path: str) -> dict:
+        """
+        Executes the full processing pipeline on the given resume path.
+        Returns structured results for resume and optionally job description.
+        """
+        result = self.pipeline.invoke(resume_path)
         return {"resume_data": result}
 
-    def process_jd(self) -> str:
+    def _get_text_resume(self, resume_path: str) -> str:
+        """Parse the resume file into text."""
+        return parse_resume(resume_path)
+
+    def _extract_resume_data(self, resume_text: str) -> dict:
+        """Extract structured resume data using the extractor."""
+        return self.extractor.extract(resume_text)
+
+    def _process_jd(self) -> str:
         processed_jd = "Something"
         return processed_jd

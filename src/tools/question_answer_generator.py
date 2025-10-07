@@ -1,12 +1,6 @@
-import os
-from dotenv import load_dotenv
-
 from configs.config import logger
 from ..utils.llm_client import LLMClient
 from ..schemas.interview_questions_schema import InterviewQuestionsSchema
-
-load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 
 class QuestionAnswerGenerator:
@@ -17,7 +11,7 @@ class QuestionAnswerGenerator:
             use_resoning_model=True,
         )
 
-    def generateInterviewQnAns(self, resume_json: str, job_description: str) -> str:
+    def generateInterviewQnAns(self, resume_json: str, job_description: str):
         prompt = f"""
             You are an interviewer preparing 15 short-answer technical questions for a candidate.
             Use ONLY the pasted candidate resume and job description as source.
@@ -54,7 +48,7 @@ class QuestionAnswerGenerator:
                 prompt,
                 InterviewQuestionsSchema,
             )
-            logger.info("Successfully generated interview questions.")
+            logger.info("Successfully Generated Interview Questions.")
             print("Resume \n")
             print(response.resume_questions)
             print("JD \n")
