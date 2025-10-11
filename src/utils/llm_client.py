@@ -1,61 +1,53 @@
-import os
-
-from dotenv import load_dotenv
+from pydantic import BaseModel, PrivateAttr
 from typing import Type
-from pydantic import BaseModel
 
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage
 
+import os
+from dotenv import load_dotenv
 from configs.config import settings
 
 load_dotenv()
 
 
 class LLMClient:
+    _model: str = PrivateAttr()
+    _temperature: float = PrivateAttr()
+    _llm: ChatGoogleGenerativeAI = PrivateAttr()
+
     def __init__(
         self,
         model=None,
         temperature=None,
-        use_history=False,
         use_resoning_model=False,
     ):
+        # Determine model
         if model is None:
-            if use_resoning_model:
-                self.model = settings.get("resoning_model")
-            else:
-                self.model = settings.get("normal_model")
+            self._model = (
+                settings.get("resoning_model")
+                if use_resoning_model
+                else settings.get("normal_model")
+            )
         else:
-            self.model = model
+            self._model = model
 
-        if temperature is None:
-            self.temperature = settings.get("temperature")
-        else:
-            self.model = temperature
+        # Determine temperature
+        self._temperature = temperature or settings.get("temperature")
 
+        # Get API key
         api_key = os.getenv("GOOGLE_API_KEY")
-
         if not api_key:
             raise ValueError("GOOGLE_API_KEY not found in environment variables")
 
-        self.llm = ChatGoogleGenerativeAI(
-            model=self.model,
-            temperature=self.temperature,
+        # Initialize LLM
+        self._llm = ChatGoogleGenerativeAI(
+            model=self._model,
+            temperature=self._temperature,
             api_key=api_key,
         )
-        self.use_history = use_history
-        self.history = [] if use_history else None
 
-    def invoke(self, prompt: str) -> str:
-        """Send a prompt to the LLM. Optionally maintain chat history."""
-        if self.use_history:
-            self.history.append(HumanMessage(content=prompt))
-            response = self.llm.invoke(self.history)
-            self.history.append(response)
-            print(self.history)
-        else:
-            response = self.llm.invoke(prompt)
-
+    def invoke(self, prompt: str, **kwargs) -> str:
+        response = self._llm.invoke(prompt)
         return response.content if hasattr(response, "content") else str(response)
 
     def get_structured_response(
@@ -63,20 +55,6 @@ class LLMClient:
         prompt: str,
         schema: Type[BaseModel],
     ) -> BaseModel:
-        structured_llm = self.llm.with_structured_output(schema)
-
-        if self.use_history:
-            from langchain.schema import HumanMessage
-
-            self.history.append(HumanMessage(content=prompt))
-            response = structured_llm.invoke(self.history)
-            self.history.append(response)
-        else:
-            response = structured_llm.invoke(prompt)
-
+        structured_llm = self._llm.with_structured_output(schema)
+        response = structured_llm.invoke(prompt)
         return response
-
-    def _reset_history(self):
-        """Clear conversation history if enabled."""
-        if self.use_history:
-            self.history = []
