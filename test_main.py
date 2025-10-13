@@ -1,20 +1,33 @@
-from src.utils.llm_client_with_history import LLMClientWithHistory
+from src.utils.llm_client import LLMClient
 
-client = LLMClientWithHistory()
-resp = client.invoke_with_history("session_1", "Hello — who are you?")
-print("AI:", resp)
+# Initialize client
+client = LLMClient()
 
-resp2 = client.invoke_with_history("session_1", "What did I just ask you?")
+# Session 1 interactions
+resp1 = client.invoke("Hello — who are you?", session_id="session_1")
+print("AI:", resp1)
+
+resp2 = client.invoke("What did I just ask you?", session_id="session_1")
 print("AI:", resp2)
 
-# Get history
-print(client.get_history("session_1"))
+resp3 = client.invoke("Summarize our chat in one line.", session_id="session_1")
+print("AI:", resp3)
 
-# Try invoking via RunnableWithMessageHistory (useful if you want to plug this into other runnables)
-resp3 = client.invoke_with_history("session_1", "Summarize our chat in one line.")
-resp4 = client.invoke_with_history("session_2", "He my name is Sandesh")
-resp5 = client.invoke_with_history("session_2", "Summarize our chat in one line.")
-print("AI via runnable:", resp3)
-print(client.get_history("session_2"))
+# View chat history for session_1
+print("History (session_1):", client.get_history("session_1"))
 
-print("AI via runnable:", resp5)
+# Session 2 interactions
+resp4 = client.invoke("Hey, my name is Sandesh", session_id="session_2")
+print("AI:", resp4)
+
+resp5 = client.invoke("Summarize our chat in one line.", session_id="session_2")
+print("AI:", resp5)
+
+# View chat history for session_2
+print("History (session_2):", client.get_history("session_2"))
+
+# Optional — separate test with generic example
+sid = "example-session"
+resp6 = client.invoke("Hello!", session_id=sid)
+print("Response:", resp6)
+print("History:", client.get_history(sid))
