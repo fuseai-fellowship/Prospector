@@ -41,11 +41,10 @@ class LLMClient:
         # Store chat sessions in memory
         self._sessions: Dict[str, InMemoryChatMessageHistory] = {}
 
-        def get_session_history(session_id: Optional[str]):
-            sid = session_id or "__ephemeral__"
-            if sid not in self._sessions:
-                self._sessions[sid] = InMemoryChatMessageHistory()
-            return self._sessions[sid]
+        def get_session_history(session_id: str):
+            if session_id not in self._sessions:
+                self._sessions[session_id] = InMemoryChatMessageHistory()
+            return self._sessions[session_id]
 
         # Create runnable that automatically saves chat history
         self.runnable = RunnableWithMessageHistory(
@@ -70,12 +69,19 @@ class LLMClient:
     ) -> BaseModel:
         structured_llm = self.llm.with_structured_output(schema)
         if session_id:
-            config = {"configurable": {"session_id": session_id}}
-            structured_runnable = RunnableWithMessageHistory(
-                runnable=structured_llm,
-                get_session_history=self._get_session_history,
-            )
-            return structured_runnable.invoke(prompt, config=config)
+            try:
+                config = {"configurable": {"session_id": session_id}}
+                structured_runnable = RunnableWithMessageHistory(
+                    runnable=structured_llm,
+                    get_session_history=self._get_session_history,
+                )
+                resp = structured_runnable.invoke(prompt, config=config)
+                print("LLM resp \n")
+                print(resp)
+                return resp
+            except Exception as e:
+                print(e)
+
         return structured_llm.invoke(prompt)
 
     # ----------------- History Management -----------------

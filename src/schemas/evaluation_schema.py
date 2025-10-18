@@ -3,11 +3,11 @@ from typing import List, Optional
 
 
 class EvaluationScores(BaseModel):
-    relevance: int = Field(..., ge=1, le=5)
-    clarity: int = Field(..., ge=1, le=5)
-    depth: int = Field(..., ge=1, le=5)
-    accuracy: int = Field(..., ge=1, le=5)
-    completeness: int = Field(..., ge=1, le=5)
+    relevance: int = Field(..., ge=0, le=10)
+    clarity: int = Field(..., ge=0, le=10)
+    depth: int = Field(..., ge=0, le=10)
+    accuracy: int = Field(..., ge=0, le=10)
+    completeness: int = Field(..., ge=0, le=10)
 
 
 class AnswerEvaluation(BaseModel):

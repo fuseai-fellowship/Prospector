@@ -3,7 +3,7 @@ from pathlib import Path
 from src.agents.jd_resume_processor_agent import JdResumeProcessorAgent
 from src.utils.llm_client import LLMClient
 from configs.config import settings
-from src.tools.question_answer_generator import QuestionAnswerGenerator
+from src.tools.question_answer_generator import QuestionGenerator
 from src.tools.answer_evaluation_tool import AnswerEvaluationTool
 from src.agents.evaluation_agent import EvaluationAgent
 from src.schemas.interview_questions_schema import (
@@ -208,7 +208,7 @@ def main():
     )
 
     status = True
-    eval_agent = EvaluationAgent(chat_history_name="chat_history")
+    eval_agent = EvaluationAgent()
 
     all_question = interview_questions
     new_ordered_qn = []
@@ -227,7 +227,7 @@ def main():
             new_ordered_qn.append(question_item)
 
             eval, followup = eval_agent.run(
-                user_answer=question_item, jd=jd, chat_history=new_ordered_qn
+                user_answer=question_item, jd=jd, session_id="session"
             )
             eval_list.append(eval)
             if followup:
@@ -235,11 +235,9 @@ def main():
                 print(f"ID: {followup.id}, Question: {followup.question}")
                 ans = input("Enter Answer ")
                 followup_eval, followup = eval_agent.run(
-                    user_answer=question_item, jd=jd, chat_history=new_ordered_qn
+                    user_answer=question_item, jd=jd, session_id="session"
                 )
                 eval_list.append(followup_eval)
-
-            print(followup)
 
     print(new_ordered_qn)
     print(eval_list)

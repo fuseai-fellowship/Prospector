@@ -11,26 +11,25 @@ class FollowUpQuestionTool(BaseTool):
     description: str = "Generates context-aware follow-up questions to assess a candidate’s understanding and clarify incomplete interview answers."
 
     def __init__(self, model=None, temperature=None):
+        self.session_id: str
+
         self._llm = LLMClient(
             model=model,
             temperature=temperature,
-            use_resoning_model=True,
+            use_reasoning_model=True,
         )
 
     def _run(
-        self, resume_json: str, job_description: str, chat_history
+        self, resume_json: str, job_description: str, session_id: str
     ) -> QuestionItem:
-        prompt = f"""
+        prompt = """
                 You are an AI interview assistant that generates a single, high-quality follow-up question
-                based on the interview context provided.
-
-                The evaluation has already determined that a follow-up question is needed.
-                Your task is only to generate one insightful and context-aware follow-up question.
-
-                Use the following information to guide your generation:
-                - **Chat History:** [{chat_history}]
+                based on the interview context provided. The evaluation has already determined that a follow-up question is needed.
+                Your task is only to generate one insightful and context-aware follow-up question based on the previous question and answer that the we have provided
 
                 Guidelines:
+                - Use the Chat History guide your generation.
+                - Generate the question in the given schema or format
                 - **Do not repeat or rephrase previous questions.**
                 - Focus on clarifying or deepening the candidate’s latest answer.
                 - Be phrased naturally as if spoken by an interviewer.
@@ -46,13 +45,14 @@ class FollowUpQuestionTool(BaseTool):
             logger.info("Generating Follow-up Questions")
 
             response = self._llm.get_structured_response(
-                prompt,
-                QuestionItem,
+                prompt=prompt,
+                session_id=session_id,
+                schema=QuestionItem,
             )
-
-            logger.info("Successfully Generated Interview Questions.")
+            logger.info("Successfully Generated Followup Questions.")
+            print(self._llm.get_history(session_id=session_id))
             return response
 
         except Exception as e:
-            logger.critical(f"Error Follow-up questions: {e}")
+            logger.critical(f"Error in Follow-up questions: {e}")
             return e

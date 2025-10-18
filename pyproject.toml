@@ -13,5 +13,6 @@ dependencies = [
     "pdfplumber>=0.11.7",
     "pydantic[email]>=2.11.9",
     "ruff>=0.13.1",
+    "streamlit>=1.50.0",
     "unstructured[local-inference]>=0.18.15",
 ]

@@ -5,7 +5,7 @@ from ..utils.llm_client import LLMClient
 from ..schemas.interview_questions_schema import InterviewQuestionsSchema
 
 
-class QuestionAnswerGenerator:
+class QuestionGenerator:
     def __init__(self, model=None, temperature=None):
         self.llm = LLMClient(
             model=model,
@@ -13,7 +13,7 @@ class QuestionAnswerGenerator:
             use_resoning_model=True,
         )
 
-    def generateInterviewQnAns(
+    def generateInterviewQn(
         self, resume_json: str, job_description: str, no_of_qn: int = 9
     ) -> InterviewQuestionsSchema:
         per_cat_qn = no_of_qn / 3
@@ -27,7 +27,7 @@ class QuestionAnswerGenerator:
             - jd_questions ({per_cat_qn} questions)
             - mixed_questions ({per_cat_qn} questions)
             2. Order each section's questions from Easy → Medium → Hard.
-            3. Each question must:
+            3. Each question must:  
             - Be phrased naturally as if spoken by an interviewer.
             - Be answerable within ~1 minute in a concise spoken reply.
             - Be specific, uniquely answerable, and have only one correct answer.

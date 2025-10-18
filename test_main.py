@@ -1,33 +1,36 @@
-from src.utils.llm_client import LLMClient
+import streamlit as st
+from pathlib import Path
+import importlib.util
 
-# Initialize client
-client = LLMClient()
+st.set_page_config(page_title="Interview App", page_icon="🎯", layout="centered")
 
-# Session 1 interactions
-resp1 = client.invoke("Hello — who are you?", session_id="session_1")
-print("AI:", resp1)
 
-resp2 = client.invoke("What did I just ask you?", session_id="session_1")
-print("AI:", resp2)
+def load_module_from_path(path: Path, module_name: str):
+    spec = importlib.util.spec_from_file_location(module_name, str(path))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
-resp3 = client.invoke("Summarize our chat in one line.", session_id="session_1")
-print("AI:", resp3)
 
-# View chat history for session_1
-print("History (session_1):", client.get_history("session_1"))
+ROOT = Path(__file__).parent
+PAGES = {
+    "Home": ROOT / "pages" / "home.py",
+    "Interview": ROOT / "pages" / "interview_page.py",
+    "Admin": ROOT / "pages" / "interviewer_page.py",
+}
+st.sidebar.title("Navigation")
 
-# Session 2 interactions
-resp4 = client.invoke("Hey, my name is Sandesh", session_id="session_2")
-print("AI:", resp4)
+if "page" not in st.session_state:
+    st.session_state.page = "Home"
 
-resp5 = client.invoke("Summarize our chat in one line.", session_id="session_2")
-print("AI:", resp5)
+for page_name in PAGES.keys():
+    if st.sidebar.button(page_name, key=page_name):
+        st.session_state.page = page_name
 
-# View chat history for session_2
-print("History (session_2):", client.get_history("session_2"))
+st.sidebar.markdown("---")
 
-# Optional — separate test with generic example
-sid = "example-session"
-resp6 = client.invoke("Hello!", session_id=sid)
-print("Response:", resp6)
-print("History:", client.get_history(sid))
+selected_path = PAGES[st.session_state.page]
+page_module = load_module_from_path(
+    selected_path, f"{st.session_state.page.lower()}_page"
+)
+page_module.render()

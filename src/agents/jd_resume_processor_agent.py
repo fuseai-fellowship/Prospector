@@ -5,10 +5,9 @@ from ..utils.resume_parser import parse_resume
 
 class JdResumeProcessorAgent:
     def __init__(
-        self,
-        job_description: str = None,
+        self, job_description: str = None, model: str = None, temperature: int = None
     ):
-        self.extractor = SturResumeExtractor()
+        self.extractor = SturResumeExtractor(model=model, temperature=temperature)
 
         if job_description:
             # Pass steps as separate arguments
