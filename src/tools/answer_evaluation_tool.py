@@ -8,44 +8,94 @@ from ..utils.llm_client import LLMClient
 
 class AnswerEvaluationTool(BaseTool):
     name: str = "AnswerEvaluator"
-    description: str = "A LangChain tool that assesses interview answers by scoring relevance, clarity, depth, accuracy, and completeness, and provides a concise overall assessment of the candidate’s understanding."
+    description: str = (
+        "Evaluates interview answers with scoring and follow-up recommendations"
+    )
     _llm: LLMClient = PrivateAttr()
 
     def __init__(self, model=None, temperature=None):
         super().__init__()
         self._llm = LLMClient(
-            model=model,
-            temperature=temperature,
+            model=model, temperature=temperature, use_reasoning_model=True
         )
 
-    def _run(self, user_answer, session_id) -> AnswerEvaluation:
+    def _run(self, user_answer, session_id: str) -> AnswerEvaluation:
+        """
+        Evaluate a user's answer to an interview question.
+
+        Args:
+            user_answer: QuestionItem with the question and candidate's answer
+            session_id: Session ID for history tracking
+
+        Returns:
+            AnswerEvaluation with scores and follow-up recommendation
+        """
         prompt = f"""
-                    Evaluate Understanding: Check if the candidate’s answer demonstrates a clear understanding of the question and sufficiently addresses the target concepts.
-                    Score the Answer across the following categories (each rated 1–5, where 1 = very poor and 5 = excellent):
+                You are an expert interviewer tasked with evaluating a candidate's answer.
 
-                    Relevance: Does the answer stay focused on the question and cover the target concepts?
-                    Clarity: Is the answer easy to understand, logically structured, and free from ambiguity?
-                    Depth: Does the answer provide sufficient detail and insight, showing real understanding beyond surface-level statements?
-                    Accuracy: Are the facts, concepts, or technical points explained correctly?
-                    Completeness: Does the answer cover all important aspects of the question without leaving major gaps?
+                **Question Details:**
+                - Question ID: {user_answer.id}
+                - Question: {user_answer.question}
+                - Target Concepts: {", ".join(user_answer.target_concepts)}
+                - Difficulty Level: {user_answer.difficulty}
 
-                    Provide a short overall assessment (1 sentences).
-                    Alse decide whether this requires followup question or not. Also If the users doesn't know the answer then keep it false and give the score 0 for everything.
-                    Here is user_answer[{user_answer}]
+                **Candidate's Answer:**
+                {user_answer.answer}
+
+                **Evaluation Criteria (0-10 for each):**
+                1. Relevance: Does the answer address the question and target concepts?
+                2. Clarity: Is the answer structured and easy to understand?
+                3. Depth: Does it demonstrate deep understanding beyond surface-level knowledge?
+                4. Accuracy: Are the technical facts and concepts correct?
+                5. Completeness: Does it cover all important aspects?
+
+                **Scoring Guidelines:**
+                - "Don't know" or similar → all scores = 0, follow_up_status = false
+                - Partial understanding or incomplete → moderate scores, follow_up_status = true
+                - Vague or error-prone → lower scores, follow_up_status = true
+                - Complete and accurate → high scores, follow_up_status = false
+                - High-level understanding or key terms are sufficient; exact code is not required.
+
+                **Overall Assessment:**
+                Provide a concise, one-sentence summary of the candidate's answer.
+
+                **Follow-up Decision:**
+                Set follow_up_status = true only if:
+                - Answer shows partial understanding or needs clarification
+                - Answer is incomplete but demonstrates basic knowledge
+                - Candidate made errors that need correction
+
+                Set follow_up_status = false if:
+                - Candidate has no idea ("don't know")
+                - Answer is complete and accurate
+
+                Keep the evaluation focused and concise; assume candidates may not include every detail.
                 """
+
         try:
-            logger.info("Evaluating User Answer")
+            logger.info(f"Evaluating answer for Question ID: {user_answer.id}")
+
+            # Get structured response with conversation history
             response = self._llm.get_structured_response(
                 prompt=prompt,
                 schema=AnswerEvaluation,
                 session_id=session_id,
+                metadata={
+                    "question_id": user_answer.id,
+                    "action": "evaluation",
+                    "difficulty": user_answer.difficulty,
+                },
             )
-            logger.info("Successfully Evaluated User Answer")
-            return response
-        except Exception as e:
-            logger.critical(f"Error Evaluating User Answer {e}")
-            print(e)
 
-    async def _arun(self, user_answer):
-        """Asynchronous execution using LLM"""
-        return self._run(user_answer)
+            logger.info(
+                f"✅ Evaluation complete - Follow-up needed: {response.follow_up_status}"
+            )
+            return response
+
+        except Exception as e:
+            logger.critical(f"❌ Error evaluating answer: {e}")
+            raise
+
+    async def _arun(self, user_answer, session_id: str):
+        """Asynchronous execution"""
+        return self._run(user_answer, session_id)

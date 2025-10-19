@@ -15,4 +15,3 @@ class AnswerEvaluation(BaseModel):
     overall_assessment: str
     scores: EvaluationScores
     follow_up_status: bool
-    # follow_up_question: Optional[str] = None

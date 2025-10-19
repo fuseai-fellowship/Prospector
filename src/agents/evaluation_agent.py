@@ -17,7 +17,7 @@ class EvaluationAgent:
             user_answer=user_answer, session_id=session_id
         )
         print(eval_result)
-        need_followup: bool = True
+        need_followup: bool = eval_result.follow_up_status
 
         if need_followup:
             followup_questions = self.followup_question_tool._run(

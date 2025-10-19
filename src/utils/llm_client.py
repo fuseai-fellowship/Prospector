@@ -2,18 +2,25 @@ import os
 from dotenv import load_dotenv
 from configs.config import settings
 from pydantic import BaseModel
-from typing import Dict, List, Optional, Type
+from typing import Optional, Type, Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage, AIMessage
-from langchain_core.chat_history import InMemoryChatMessageHistory
-from langchain_core.runnables import RunnableWithMessageHistory
 
+from .chat_history_manager import ChatHistoryManager
 
 load_dotenv()
 
+# Single Shared instance for all
+chat_history_manager = ChatHistoryManager()
+
 
 class LLMClient:
+    """
+    Enhanced LLM Client with integrated history management.
+    Handles both regular and structured responses with conversation context.
+    """
+
     def __init__(
         self,
         model: Optional[str] = None,
@@ -38,82 +45,138 @@ class LLMClient:
             api_key=api_key,
         )
 
-        # Store chat sessions in memory
-        self._sessions: Dict[str, InMemoryChatMessageHistory] = {}
+        # Initialize history manager
+        self.history_manager = chat_history_manager
 
-        def get_session_history(session_id: str):
-            if session_id not in self._sessions:
-                self._sessions[session_id] = InMemoryChatMessageHistory()
-            return self._sessions[session_id]
+    # ==================== Basic Invoke ====================
 
-        # Create runnable that automatically saves chat history
-        self.runnable = RunnableWithMessageHistory(
-            runnable=self.llm,
-            get_session_history=get_session_history,
-        )
+    def invoke(
+        self,
+        prompt: str,
+        session_id: Optional[str] = None,
+        use_history: Optional[bool] = True,
+        add_to_history: Optional[bool] = True,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """
+        Basic invoke with optional conversation history.
 
-        self._get_session_history = get_session_history
+        Args:
+            prompt: The prompt to send to the LLM
+            session_id: Session ID for history tracking
+            metadata: Optional metadata to attach to messages
 
-    # ----------------- Basic invoke -----------------
-    def invoke(self, prompt: str, session_id: Optional[str] = None) -> str:
-        if not session_id:
-            response = self.llm.invoke(prompt)
+        Returns:
+            String response from LLM
+        """
+        if session_id & add_to_history:
+            # Build prompt with conversation context
+            full_prompt = self.history_manager.build_context_for_llm(
+                session_id=session_id, current_prompt=prompt, include_last_n=10
+            )
         else:
-            config = {"configurable": {"session_id": session_id}}
-            response = self.runnable.invoke(prompt, config=config)
-        return getattr(response, "content", str(response))
+            full_prompt = prompt
 
-    # ----------------- Structured output -----------------
+        # Get response from LLM
+        response = self.llm.invoke(full_prompt)
+        response_content = getattr(response, "content", str(response))
+
+        # Save to history if session_id provided
+        if session_id & add_to_history:
+            self.history_manager.add_user_message(session_id, prompt, metadata=metadata)
+            self.history_manager.add_assistant_message(
+                session_id, response_content, metadata=metadata
+            )
+
+        return response_content
+
+    # ==================== Structured Output ====================
+
     def get_structured_response(
-        self, prompt: str, schema: Type[BaseModel], session_id: Optional[str] = None
+        self,
+        prompt: str,
+        schema: Type[BaseModel],
+        session_id: Optional[str] = None,
+        use_history: Optional[bool] = True,
+        add_to_history: Optional[bool] = True,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> BaseModel:
+        """
+        Get structured response with conversation history support.
+
+        Args:
+            prompt: The prompt to send to the LLM
+            schema: Pydantic model schema for structured output
+            session_id: Session ID for history tracking
+            metadata: Optional metadata to attach to messages
+
+        Returns:
+            Pydantic model instance
+        """
         structured_llm = self.llm.with_structured_output(schema)
-        if session_id:
-            try:
-                config = {"configurable": {"session_id": session_id}}
-                structured_runnable = RunnableWithMessageHistory(
-                    runnable=structured_llm,
-                    get_session_history=self._get_session_history,
-                )
-                resp = structured_runnable.invoke(prompt, config=config)
-                print("LLM resp \n")
-                print(resp)
-                return resp
-            except Exception as e:
-                print(e)
 
-        return structured_llm.invoke(prompt)
+        if session_id and use_history:
+            full_prompt = self.history_manager.build_context_for_llm(
+                session_id=session_id, current_prompt=prompt, include_last_n=10
+            )
+        else:
+            full_prompt = prompt
 
-    # ----------------- History Management -----------------
-    def get_history(self, session_id: str) -> List[dict]:
-        if session_id not in self._sessions:
-            return []
-        history = self._sessions[session_id].messages
+        # Get structured response
+        response = structured_llm.invoke(full_prompt)
+
+        # Save to history if session_id provided
+        if session_id and add_to_history:
+            self.history_manager.add_structured_exchange(
+                session_id=session_id,
+                user_content=prompt,
+                assistant_response=response,
+                user_metadata=metadata,
+                assistant_metadata={
+                    **(metadata or {}),
+                    "schema": schema.__name__,
+                    "structured": True,
+                },
+            )
+
+        return response
+
+    # ==================== History Management Shortcuts ====================
+
+    def get_history(self, session_id: str, limit: Optional[int] = None) -> list[dict]:
+        """
+        Get conversation history as list of dicts.
+        Format: [{'role': 'user'|'assistant', 'content': '...', 'timestamp': '...'}]
+        """
+        messages = self.history_manager.get_messages(session_id, limit)
         return [
             {
-                "role": "user" if isinstance(msg, HumanMessage) else "assistant",
+                "role": msg.role,
                 "content": msg.content,
+                "timestamp": msg.timestamp,
+                "metadata": msg.metadata,
             }
-            for msg in history
+            for msg in messages
         ]
 
     def clear_history(self, session_id: str):
-        self._sessions.pop(session_id, None)
+        """Clear history for a specific session"""
+        self.history_manager.delete_session(session_id)
 
     def clear_all_histories(self):
-        self._sessions.clear()
+        """Clear all session histories"""
+        self.history_manager.clear_all_sessions()
 
-    # ----------------- Export / Import -----------------
-    def export_history(self, session_id: str) -> Dict[str, List[dict]]:
-        return {session_id: self.get_history(session_id)}
+    def print_history(
+        self, session_id: str, limit: Optional[int] = None, show_metadata: bool = False
+    ):
+        """Pretty print conversation history"""
+        self.history_manager.print_session(
+            session_id, limit=limit, show_metadata=show_metadata
+        )
 
-    def import_history(self, session_id: str, items: List[dict]):
-        history = InMemoryChatMessageHistory()
-        for item in items:
-            role = item.get("role")
-            content = item.get("content", "")
-            if role == "user":
-                history.add_message(HumanMessage(content=content))
-            else:
-                history.add_message(AIMessage(content=content))
-        self._sessions[session_id] = history
+    def get_context_summary(self, session_id: str, max_length: int = 1000) -> str:
+        """Get a brief summary of conversation context"""
+        return self.history_manager.build_context_string(
+            session_id=session_id, max_length=max_length
+        )

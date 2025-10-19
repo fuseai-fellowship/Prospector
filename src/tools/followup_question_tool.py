@@ -1,4 +1,3 @@
-import random
 from langchain.tools import BaseTool
 
 from configs.config import logger
@@ -16,43 +15,51 @@ class FollowUpQuestionTool(BaseTool):
         self._llm = LLMClient(
             model=model,
             temperature=temperature,
-            use_reasoning_model=True,
         )
 
-    def _run(
-        self, resume_json: str, job_description: str, session_id: str
-    ) -> QuestionItem:
-        prompt = """
-                You are an AI interview assistant that generates a single, high-quality follow-up question
-                based on the interview context provided. The evaluation has already determined that a follow-up question is needed.
-                Your task is only to generate one insightful and context-aware follow-up question based on the previous question and answer that the we have provided
+    def _run(self, user_answer: QuestionItem, jd: str, session_id: str) -> QuestionItem:
+        prompt = f"""
+        You are an AI interview assistant generating a follow-up question.
+        
+        **Context:**
+        - Original id: {user_answer.id}
+        - Original Question: {user_answer.question}
+        - Target Concepts: {", ".join(user_answer.target_concepts)}
+        - Candidate's Answer: {user_answer.answer}
+        - Job Description: {jd}
+        
+        The evaluation has determined that a follow-up question is needed.
+        
+        **Your Task:**
+        Generate ONE insightful follow-up question that:
+        - Probes deeper into the candidate's understanding
+        - Clarifies ambiguous or incomplete parts of their answer
+        - Is related to the original question's target concepts
+        - Can be answered in ~1 minute
+        - Has a clear, specific answer
+        - keep track of follow_up_question_no and its List length should be follow_up_count
+        
+        **Requirements:**
+        - Single-line question (no newlines)
+        - Professional and conversational tone
+        - Include relevant target_concepts
+        - Assign appropriate difficulty level
+        -- Generate a new unique follow-up ID as follows: if {user_answer.id} is a single digit, append "01" to make a three-digit ID (e.g., 3 → 301); if {user_answer.id} is already three digits, increment it numerically for each follow-up (e.g., 301 → 302 → 303, …).
 
-                Guidelines:
-                - Use the Chat History guide your generation.
-                - Generate the question in the given schema or format
-                - **Do not repeat or rephrase previous questions.**
-                - Focus on clarifying or deepening the candidate’s latest answer.
-                - Be phrased naturally as if spoken by an interviewer.
-                - Be answerable within about 1 minute in a concise spoken reply.
-                - Be specific, uniquely answerable, and have only one correct answer.
-                - Include a short array of exact **target_concepts** derived from the resume or job description.
-                - The question must be a **single-line string** (no newlines).
-                - Maintain a **professional and conversational** tone.
-                - Generate only one follow-up question.
-                """
+
+        Do NOT repeat or rephrase the original question.
+        """
 
         try:
-            logger.info("Generating Follow-up Questions")
-
+            logger.info(f"Generating Follow-up for Question ID: {user_answer.id}")
             response = self._llm.get_structured_response(
                 prompt=prompt,
                 session_id=session_id,
                 schema=QuestionItem,
+                add_to_history=False,
             )
-            logger.info("Successfully Generated Followup Questions.")
-            print(self._llm.get_history(session_id=session_id))
+            logger.info("Successfully Generated Follow-up Question")
             return response
-
         except Exception as e:
-            logger.critical(f"Error in Follow-up questions: {e}")
-            return e
+            logger.critical(f"Error generating follow-up question: {e}")
+            raise

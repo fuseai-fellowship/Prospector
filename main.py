@@ -11,6 +11,10 @@ from src.schemas.interview_questions_schema import (
     InterviewQuestionsSchema,
 )
 
+from src.utils.llm_client import LLMClient
+
+llm = LLMClient()
+
 
 def main():
     # resume_path = Path("data/resume_data/SandeshShrestha_CV.pdf")
@@ -226,18 +230,26 @@ def main():
             question_item.answer = ans
             new_ordered_qn.append(question_item)
 
-            eval, followup = eval_agent.run(
+            eval, followupQuestion = eval_agent.run(
                 user_answer=question_item, jd=jd, session_id="session"
             )
+            print("History \n")
+            llm.print_history("session")
             eval_list.append(eval)
-            if followup:
-                new_ordered_qn.append(followup)
-                print(f"ID: {followup.id}, Question: {followup.question}")
+            while followupQuestion:
+                new_ordered_qn.append(followupQuestion)
+                print(
+                    f"ID: {followupQuestion.id}, Question: {followupQuestion.question}"
+                )
                 ans = input("Enter Answer ")
-                followup_eval, followup = eval_agent.run(
-                    user_answer=question_item, jd=jd, session_id="session"
+                followupQuestion.answer = ans
+                followup_eval, followupQuestion = eval_agent.run(
+                    user_answer=followupQuestion, jd=jd, session_id="session"
                 )
                 eval_list.append(followup_eval)
+                print("History \n")
+
+                llm.print_history("session")
 
     print(new_ordered_qn)
     print(eval_list)
