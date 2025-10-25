@@ -1,10 +1,10 @@
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class PersonalDetails(BaseModel):
     name: Optional[str] = ""
-    email: Optional[EmailStr] = ""
+    email: Optional[str] = ""
     phone: Optional[str] = ""
     address: Optional[str] = ""
     linkedin: Optional[str] = ""

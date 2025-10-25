@@ -17,12 +17,17 @@ class SturResumeExtractor:
         self.llm = LLMClient(model=model, temperature=temperature)
         self.model = settings.get("normal_model")
 
-    def extract(self, resume_text: str) -> dict:
+    def extract(self, resume_text: str) -> ResumeSchema:
         stur_resume_prompt = f"""
             Extract structured JSON data from the following resume text:
             {resume_text}
 
-            Respond **only** with valid JSON, no explanations, no markdown, no backticks. If any field is missing, return an empty string, empty array, or empty object for that field. Extract all skills mentioned anywhere in the resume. Do not include any explanations or text outside the JSON.
+            Respond only with valid JSON.
+            Do not include any explanations, markdown, or backticks.
+            For any missing field, use an empty string (""), empty array ([]), or empty object ({{}}) as appropriate.
+            Extract all skills mentioned anywhere in the resume.
+            Keep all the extra info in the others section
+            Ensure the JSON strictly matches the schema structure.
         """
 
         try:

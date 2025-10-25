@@ -1,0 +1,86 @@
+{
+    "personal_details": {
+        "name": "Sandesh Shrestha",
+        "email": "sandeshrestha115@gmail",
+        "phone": "9741685611",
+        "address": "Kathmandu",
+        "linkedin": "LinkedIn",
+        "github": "Github"
+    },
+    "projects": [
+        {
+            "title": "Agentic RAG System",
+            "description": "Developed an Advanced RAG System for document-based question answering, leveraging LangChain for tool creation (e.g., booking callbacks), Pinecone for vector storage, and Google Gemini 1.5 Pro as the generation model. Implemented optimization techniques, including re-ranking, hybrid search, and prompt engineering, to enhance system efficiency and accuracy in retrieving and generating responses."
+        },
+        {
+            "title": "Realtime Chat App",
+            "description": "Developed a full-stack web application using Django and Streamlit to perform sentiment analysis and text summarization on product reviews, providing users with AI-driven insights and interactive chatbot with product."
+        },
+        {
+            "title": "AI-Powered Dashboard",
+            "description": "Developed a full-stack web application using Django and Streamlit to perform sentiment analysis and text summarization on product reviews, providing users with AI-driven insights and interactive chatbot with product."
+        }
+    ],
+    "work_experience": [
+        {
+            "company": "Fusemachine Nepal",
+            "position": "Associate Machine Learning",
+            "duration": "May 2025– Aug 2025",
+            "description": "Executed the full end-to-end development lifecycle for an in-house project focused on AI-generated content (AIGC) detection, fine-tuning a large language model using tools such as Transformers, PyTorch, and PEBFT, from initial research and model selection to experimentation and final documentation. Captured approximately 85% of the cases amongst 100k data points and optimized the system, decreasing latency by 30-35%."
+        }
+    ],
+    "certifications": [
+        {
+            "name": "Version Control",
+            "issuer": "Meta",
+            "year": ""
+        },
+        {
+            "name": "DevOps Workshop",
+            "issuer": "IIMS College",
+            "year": "Mar, 2025"
+        }
+    ],
+    "education": [
+        {
+            "degree": "Bachelors of computer Science (AI Specialization)",
+            "institution": "Taylors University",
+            "year": "Dec, 2025"
+        },
+        {
+            "degree": "AI Fellowship, Microdegree in Artificial Intelligence",
+            "institution": "Fusemachine",
+            "year": "Nov, 2025"
+        }
+    ],
+    "skills": [
+        "Python",
+        "Machine Learning",
+        "agents",
+        "Git",
+        "Github",
+        "Git best practices",
+        "Git conflicts",
+        "Docker",
+        "Linux",
+        "CI/CD Pipelines",
+        "Github Actions",
+        "Nginx",
+        "Transformers",
+        "PyTorch",
+        "PEBFT",
+        "LangChain",
+        "Pinecone",
+        "Google Gemini 1.5 Pro",
+        "re-ranking",
+        "hybrid search",
+        "prompt engineering",
+        "Django",
+        "Streamlit",
+        "sentiment analysis",
+        "text summarization"
+    ],
+    "others": {
+        "additional_info": "Adaptable Machine Learning Aspirant with a strong foundation in computer science and AI specialization. Experienced in Python, Machine Learning, and agents. Eager to contribute enthusiasm, adaptability, and a fresh perspective to a dynamic team."
+    }
+}

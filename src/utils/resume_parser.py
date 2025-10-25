@@ -1,11 +1,13 @@
 import pdfplumber
 import docx2txt
 import os
-from configs.config import logger
+from configs.config import logger, settings
 
 
-def parse_resume(file_path: str = None) -> str:
+def text_extractor(file_path: str = None) -> str:
     """Extract text from a PDF or DOCX file."""
+    file_path = f"{settings.get('all_resumes_path')}/{file_path}"
+    print(file_path)
 
     if not file_path or not os.path.exists(file_path):
         raise ValueError(f"Resume file not found: {file_path}")

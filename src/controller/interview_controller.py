@@ -1,29 +1,35 @@
-from ..agents.jd_resume_processor_agent import JdResumeProcessorAgent
-from ..agents.evaluation_agent import EvaluationAgent
-from ..tools.question_answer_generator import QuestionGenerator
+import json
+
+from ..agents.jd_resume_processor_agent import ResumeProcessorAgent
+
+
+class JdController:
+    def __init__(self):
+        pass
+
+    def process_jd(self, jd_text: str):
+        word_count = len(jd_text.split())
+        char_count = len(jd_text)
+        processed_jd = jd_text
+
+        return word_count, char_count, processed_jd
 
 
 class InterviewController:
-    def __init__(self, resume_paths: list[str], jd: str):
-        self.jd = jd
-        self.resume_paths = resume_paths
+    def __init__(self):
+        self.resume_processor = ResumeProcessorAgent()
 
-    def process_resume_jd(self):
-        resume_processor = JdResumeProcessorAgent()
-        question_generator = QuestionGenerator()
+    def process_resume(self, resume_path: str, jd_path: str):
+        f = open(resume_path, "r", encoding="utf-8")
+        resume_text = json.load(f)
+        f.close()
 
-        resume_texts = []
-        questions = []
+        f = open(jd_path, "r", encoding="utf-8")
+        jd_text = json.load(f)
+        f.close()
 
-        for path in self.resume_paths:
-            resume_text = resume_processor.run(resume_path=path, jd_path=self.jd)
-            resume_texts.append(resume_text)
+        interview_questions = self.resume_processor.run_extraction_pipline(
+            resume_text == resume_text, jd_text == jd_text
+        )
 
-        for text in resume_texts:
-            question = question_generator.generateInterviewQn(
-                resume_json=text, job_description=self.jd
-            )
-
-            questions.append(question)
-
-        return resume_texts, questions
+        return interview_questions

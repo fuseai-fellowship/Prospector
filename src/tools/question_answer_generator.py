@@ -10,7 +10,7 @@ class QuestionGenerator:
         self.llm = LLMClient(
             model=model,
             temperature=temperature,
-            use_resoning_model=True,
+            use_reasoning_model=True,
         )
 
     def generateInterviewQn(

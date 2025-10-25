@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.agents.jd_resume_processor_agent import JdResumeProcessorAgent
+from src.agents.jd_resume_processor_agent import ResumeProcessorAgent
 from src.utils.llm_client import LLMClient
 from configs.config import settings
 from src.tools.question_answer_generator import QuestionGenerator
