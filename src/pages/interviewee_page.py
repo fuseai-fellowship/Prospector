@@ -29,7 +29,7 @@ application_controller = ApplicationController()
 
 def render():
     st.title("👩‍💻 Interviewee Portal")
-    st.markdown("Apply for the active job and complete the interview (if enabled)")
+    st.markdown("Apply for the active job and complete the interview")
 
     # Ensure directories
     Path("data/applications").mkdir(parents=True, exist_ok=True)

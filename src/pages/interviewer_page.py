@@ -8,6 +8,9 @@ import json
 from pathlib import Path
 from datetime import datetime
 from ..controller.interview_controller import JdController
+from ..utils.db import db, Job, save_job
+
+session = db.get_session()
 
 
 def render():
@@ -306,6 +309,8 @@ def render_saved_jds():
 def save_job_description(processed_jd, jd_name, make_active):
     """Save job description to file"""
     try:
+        save_job(session=session, title=jd_name)
+
         # Create directory if not exists
         jd_path = Path("data/jd_files")
         jd_path.mkdir(parents=True, exist_ok=True)

@@ -15,6 +15,21 @@ load_dotenv()
 chat_history_manager = ChatHistoryManager()
 
 
+def singleton(cls):
+    """
+    Simple singleton decorator.
+    """
+    instances = {}
+
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+
+    return get_instance
+
+
+@singleton
 class LLMClient:
     """
     Enhanced LLM Client with integrated history management.

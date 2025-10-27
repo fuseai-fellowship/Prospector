@@ -5,11 +5,15 @@ from .render_application_info import render_application_info
 
 
 def apply_job(st, application_controller):
-    submitted_cv = None
-    info = None
     active_jd = st.session_state.get("active_jd")
     active_jd_name = st.session_state.get("active_jd_name")
     validator = Validator()
+
+    # Initialize session state for application flow
+    if "application_submitted" not in st.session_state:
+        st.session_state.application_submitted = False
+    if "resume_file_name" not in st.session_state:
+        st.session_state.resume_file_name = None
 
     st.header(f"📌 Applying for: {active_jd_name}")
 
@@ -18,7 +22,16 @@ def apply_job(st, application_controller):
 
     st.markdown("---")
 
-    # APPLICATION FORM
+    # If application already submitted, go directly to the form
+    if st.session_state.application_submitted and st.session_state.resume_file_name:
+        render_application_info(
+            resume_path=st.session_state.resume_file_name,
+            application_controller=application_controller,
+        )
+
+        return
+
+    # APPLICATION FORM (only show if not yet submitted)
     st.subheader("📝 Application Form")
 
     with st.form("application_form"):
@@ -29,6 +42,7 @@ def apply_job(st, application_controller):
         )
 
         submit_app = st.form_submit_button("📨 Submit Application")
+
         if submit_app:
             resume_validation_status, validation_msg = validator.validate_resume(
                 resume_file=resume_file
@@ -43,21 +57,12 @@ def apply_job(st, application_controller):
                     st.success(
                         f"✅ Resume submitted successfully! Saved as {save_path}"
                     )
-                    submitted_cv = True
+
+                    # Store in session state
+                    st.session_state.application_submitted = True
+                    st.session_state.resume_file_name = resume_file.name
+                    st.rerun()  # Rerun to show the application info form
                 else:
                     st.error("Please upload a resume file.")
-                    submitted_cv = False
             else:
                 st.error(f"❌ {validation_msg}")
-                submitted_cv = False
-
-    if submitted_cv:
-        info = render_application_info(
-            resume_path=resume_file.name,
-            application_controller=application_controller,
-            # st=st,
-        )
-
-    if info:
-        st.write(info)  # <-- shows in Streamlit UI
-        print(info)

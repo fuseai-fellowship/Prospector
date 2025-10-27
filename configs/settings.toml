@@ -4,7 +4,11 @@ database_url = "sqlite:///default.db"
 normal_model = "gemini-2.5-flash"
 reasoning_model = "gemini-2.5-pro"
 temperature = 0.0
+db_url = "sqlite:///my_database.db"
+job_description_files = "data/jd_files"
 all_resumes_path = "data/applications/resumes"
+processed_json_resumes_path = "data/applications/processed_resumes"
+interview_result = "data/interviews"
 
 [default.logging]
 log_level = "INFO"
