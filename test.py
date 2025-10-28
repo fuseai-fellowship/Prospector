@@ -3,7 +3,7 @@ from pathlib import Path
 from src.agents.jd_resume_processor_agent import ResumeProcessorAgent
 from src.utils.llm_client import LLMClient
 from configs.config import settings
-from src.tools.question_answer_generator import QuestionGenerator
+from tools.question_generator import QuestionGenerator
 from src.tools.answer_evaluation_tool import AnswerEvaluationTool
 from src.agents.evaluation_agent import EvaluationAgent
 from src.schemas.interview_questions_schema import (

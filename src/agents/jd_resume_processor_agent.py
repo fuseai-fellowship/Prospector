@@ -1,6 +1,6 @@
 from langchain_core.runnables import RunnableLambda, RunnableSequence
 from ..tools.stur_resume_extractor import SturResumeExtractor
-from ..tools.question_answer_generator import QuestionGenerator
+from ..tools.question_generator import QuestionGenerator
 from ..tools.jd_processor_tool import JdProcessor
 from ..utils.resume_parser import text_extractor
 from ..schemas.interview_questions_schema import InterviewQuestionsSchema, QuestionItem
@@ -44,72 +44,102 @@ class ResumeProcessorAgent:
         # return questions
 
         # 1. Create 3 sample resume questions
-        resume_qns = [
-            QuestionItem(
-                id=1,
-                question="Can you tell me about your project [Project Name from Resume]?",
-                target_concepts=["Past Experience", "Communication"],
-                difficulty="Easy",
-            ),
-            QuestionItem(
-                id=2,
-                question="I see you used [Skill from Resume, e.g., 'Python'] at [Company from Resume]. What was a major challenge you faced there?",
-                target_concepts=["Python", "Problem-Solving", "Technical Deep-Dive"],
-                difficulty="Medium",
-            ),
-            QuestionItem(
-                id=3,
-                question="How did your role as [Previous Role from Resume] prepare you for this position?",
-                target_concepts=["Role Fit", "Self-Awareness"],
-                difficulty="Medium",
-            ),
+        resume_questions = [
+            {
+                "id": 1,
+                "question": "Can you describe the AI project where you implemented a transformer-based NLP model and your role in it?",
+                "target_concepts": ["Transformers", "NLP", "Project Experience"],
+                "difficulty": "Easy",
+                "answer": "Explain the project goal, dataset, model architecture, and your specific contributions.",
+            },
+            {
+                "id": 2,
+                "question": "I see you used PyTorch for model training. What was the most challenging optimization or debugging issue you faced?",
+                "target_concepts": ["PyTorch", "Optimization", "Debugging"],
+                "difficulty": "Medium",
+                "answer": "Describe a specific problem with model convergence, gradient issues, or training performance and how you resolved it.",
+            },
+            {
+                "id": 3,
+                "question": "How did your experience as a Machine Learning Engineer at [Previous Company] prepare you for production-level AI deployment?",
+                "target_concepts": [
+                    "Machine Learning",
+                    "Production Deployment",
+                    "Role Fit",
+                ],
+                "difficulty": "Medium",
+                "answer": "Highlight experience with model deployment, monitoring, and scaling in real-world applications.",
+            },
         ]
 
-        # 2. Create 3 sample JD questions
-        jd_qns = [
-            QuestionItem(
-                id=4,
-                question="This role requires experience with [JD Skill, e.g., 'AWS']. What's your experience with it?",
-                target_concepts=["AWS", "Technical Skill", "JD Fit"],
-                difficulty="Medium",
-            ),
-            QuestionItem(
-                id=5,
-                question="How do you align with our company value of [Company Value from JD]?",
-                target_concepts=["Culture Fit", "Behavioral"],
-                difficulty="Easy",
-            ),
-            QuestionItem(
-                id=6,
-                question="Describe how you would handle [JD Responsibility, e.g., 'managing stakeholders'].",
-                target_concepts=["Stakeholder Management", "Process", "Behavioral"],
-                difficulty="Hard",
-            ),
+        jd_questions = [
+            {
+                "id": 4,
+                "question": "This role requires experience with cloud platforms like AWS or GCP. Can you explain a scenario where you deployed an AI model on cloud infrastructure?",
+                "target_concepts": [
+                    "Cloud Deployment",
+                    "AWS",
+                    "GCP",
+                    "Technical Skill",
+                ],
+                "difficulty": "Medium",
+                "answer": "Describe the cloud setup, services used (EC2, S3, Lambda, etc.), and deployment process.",
+            },
+            {
+                "id": 5,
+                "question": "Our company values collaboration and code quality. Can you give an example of how you maintained high-quality ML code in a team project?",
+                "target_concepts": ["Collaboration", "Code Quality", "Behavioral"],
+                "difficulty": "Easy",
+                "answer": "Explain code review processes, unit tests, CI/CD pipelines, and teamwork practices.",
+            },
+            {
+                "id": 6,
+                "question": "You may need to manage multiple AI projects simultaneously. How would you prioritize tasks and ensure stakeholder alignment?",
+                "target_concepts": [
+                    "Project Management",
+                    "Stakeholder Communication",
+                    "Prioritization",
+                ],
+                "difficulty": "Hard",
+                "answer": "Discuss task triaging, setting milestones, communicating progress, and using tools like Jira or Trello.",
+            },
         ]
 
-        # 3. Create 3 sample mixed questions
-        mixed_qns = [
-            QuestionItem(
-                id=7,
-                question="How would you apply your experience with [Resume Skill, e.g., 'FastAPI'] to our need for [JD Need, e.g., 'building scalable microservices']?",
-                target_concepts=["FastAPI", "Scalability", "Application", "Role Fit"],
-                difficulty="Hard",
-            ),
-            QuestionItem(
-                id=8,
-                question="Your resume shows [Resume Strength, e.g., 'data analysis']. How would you use that to improve our [JD Goal, e.g., 'customer reporting']?",
-                target_concepts=["Data Analysis", "Reporting", "Proactive Thinking"],
-                difficulty="Medium",
-            ),
-            QuestionItem(
-                id=9,
-                question="This job involves [JD Duty]. I see from your resume you've [Resume Experience]. Can you connect those two for me?",
-                target_concepts=["Connecting Experience", "Role Fit"],
-                difficulty="Medium",
-            ),
+        mixed_questions = [
+            {
+                "id": 7,
+                "question": "How would you apply your experience with PyTorch and transformers to our need for a scalable NLP pipeline for customer feedback analysis?",
+                "target_concepts": ["PyTorch", "Transformers", "NLP", "Scalability"],
+                "difficulty": "Hard",
+                "answer": "Explain preprocessing, model training, deployment strategies, and performance optimization for large-scale inference.",
+            },
+            {
+                "id": 8,
+                "question": "Your resume highlights expertise in computer vision. How would you leverage that to enhance our image-based anomaly detection system?",
+                "target_concepts": [
+                    "Computer Vision",
+                    "Anomaly Detection",
+                    "Deep Learning",
+                ],
+                "difficulty": "Medium",
+                "answer": "Discuss model architectures, dataset considerations, and potential improvements in accuracy and speed.",
+            },
+            {
+                "id": 9,
+                "question": "This role requires experience in end-to-end ML pipelines. You mentioned working on a recommendation system before. How do your previous experiences translate to building robust pipelines here?",
+                "target_concepts": [
+                    "ML Pipelines",
+                    "Recommendation Systems",
+                    "Role Fit",
+                ],
+                "difficulty": "Medium",
+                "answer": "Connect past work on preprocessing, feature engineering, model training, evaluation, and deployment to the current role requirements.",
+            },
         ]
 
         # 4. Create and return the InterviewQuestionsSchema instance
         return InterviewQuestionsSchema(
-            resume_questions=resume_qns, jd_questions=jd_qns, mixed_questions=mixed_qns
+            resume_questions=resume_questions,
+            jd_questions=jd_questions,
+            mixed_questions=mixed_questions,
         )

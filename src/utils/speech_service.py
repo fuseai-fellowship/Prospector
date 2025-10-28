@@ -3,39 +3,48 @@ import io
 import time
 import numpy as np
 import soundfile as sf
-from vosk import Model, KaldiRecognizer
+from dotenv import load_dotenv
+from groq import Groq  # <-- Import Groq
 from kokoro import KPipeline
 from scipy.signal import resample_poly  # Needed for 24kHz -> 16kHz resampling
 
+from configs.config import logger
+
+load_dotenv()
+
 # --- Constants ---
-# Vosk small model expects 16kHz audio
-VOSK_SAMPLE_RATE = 16000
+# Groq/Whisper model expects 16kHz audio
+WHISPER_SAMPLE_RATE = 16000
 # Kokoro TTS model generates 24kHz audio
 KOKORO_SAMPLE_RATE = 24000
 
 
 class SpeechService:
     """
-    A service combining Kokoro TTS and Vosk ASR.
+    A service combining Kokoro TTS and Groq ASR.
     Handles model initialization and critical sample rate mismatch.
     """
 
     def __init__(self, cache_dir: str = "speech_models", preload_voices: list = None):
-        print(
-            f"INFO: Initializing SpeechService. Models will be cached in '{cache_dir}'"
+        logger.info(
+            f"Initializing SpeechService with Groq ASR. TTS models cached in '{cache_dir}'"
         )
 
-        # 1. Setup Vosk ASR (16kHz)
-        vosk_model_path = os.path.join(cache_dir, "vosk-model-small-en-us-0.15")
-        if not os.path.exists(vosk_model_path):
-            print(f"INFO: Vosk model not found. Downloading the small English model.")
-            # NOTE: In a real-world app, you would download and extract the model here
-            # For this example, we assume `uv` or a pre-run script handles model presence.
-            pass
+        # 1. Setup Groq ASR (16kHz)
+        logger.info("Initializing Groq client...")
+        try:
+            self.groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+            # You can also pass api_key=os.environ.get("GROQ_API_KEY")
 
-        print(f"INFO: Loading Vosk model from {vosk_model_path} ...")
-        self.vosk_model = Model(vosk_model_path)
-        print("INFO: Vosk model loaded.")
+            # Test connection (optional but recommended)
+            # self.groq_client.models.list()
+            logger.info("Groq client initialized.")
+        except Exception as e:
+            logger.critical(f"Failed to initialize Groq client: {e}")
+            raise
+
+        self.asr_model = "whisper-large-v3"
+        self.asr_target_rate = WHISPER_SAMPLE_RATE
 
         # 2. Setup Kokoro TTS (24kHz)
         self.tts_pipeline = KPipeline(
@@ -43,20 +52,16 @@ class SpeechService:
         )  # 'a' is the default English lang_code for Kokoro
 
         if preload_voices:
-            # Pre-warm the voice cache (optional, but good practice)
-            # This ensures required resources for the voices are loaded.
-            # In a full Kokoro setup, this might involve loading reference embeddings.
+            # (Your pre-warming logic here)
             pass
 
     def text_to_speech(self, text: str, voice: str) -> bytes:
         """Converts text to WAV audio bytes using Kokoro (24kHz)."""
-        print(f"INFO: Generating speech for '{text[:20]}...' with voice '{voice}'")
+        logger.info(f"Generating speech for '{text[:20]}...' with voice '{voice}'")
         start_time = time.time()
 
         # Kokoro returns a generator of audio chunks, we combine them.
-        audio_chunks = [
-            audio_chunk for _, _, _, audio_chunk in self.tts_pipeline(text, voice=voice)
-        ]
+        audio_chunks = [chunk[-1] for chunk in self.tts_pipeline(text, voice=voice)]
         audio_data = np.concatenate(audio_chunks)
 
         # Convert numpy array output (PCM-16) to WAV format bytes
@@ -64,52 +69,89 @@ class SpeechService:
         sf.write(buffer, audio_data, KOKORO_SAMPLE_RATE, format="WAV", subtype="PCM_16")
 
         end_time = time.time()
-        print(f"INFO: TTS finished in {end_time - start_time:.2f}s")
+        logger.info(f"TTS finished in {end_time - start_time:.2f}s")
         return buffer.getvalue()
 
     def transcribe_audio(self, wav_bytes: bytes) -> str:
         """
-        Transcribes WAV audio bytes using Vosk.
-        CRITICAL: Automatically handles resampling from 24kHz (Kokoro) to 16kHz (Vosk).
+        Transcribes WAV audio bytes using Groq.
+        CRITICAL: Automatically handles resampling from any rate to 16kHz (Whisper's requirement).
         """
         # Load audio data from bytes
         buffer = io.BytesIO(wav_bytes)
-        # sf.read detects the actual sample rate and format
-        data, sample_rate = sf.read(buffer, dtype="int16")
+        try:
+            data, sample_rate = sf.read(buffer, dtype="int16")
+        except Exception as e:
+            logger.error(f"Failed to read audio bytes with soundfile: {e}")
+            return "Audio Read Error"
 
-        if sample_rate != VOSK_SAMPLE_RATE:
-            print(
-                f"WARNING: Sample rate mismatch: TTS={sample_rate}Hz, ASR={VOSK_SAMPLE_RATE}Hz. Resampling..."
+        # --- THIS RESAMPLING LOGIC IS PERFECT, KEEP IT ---
+        if sample_rate != self.asr_target_rate:
+            logger.warning(
+                f"Sample rate mismatch: Input={sample_rate}Hz, ASR_Target={self.asr_target_rate}Hz. Resampling..."
             )
 
-            # Resample audio using polyphase filter (highest quality)
-            # Up: VOSK_SAMPLE_RATE (16000), Down: sample_rate (24000)
-            # We need to find the Greatest Common Divisor (GCD) for the up/down arguments: GCD(16000, 24000) = 8000
-            # Up = 16000 / 8000 = 2
-            # Down = 24000 / 8000 = 3
-            resampled_data = resample_poly(data, 2, 3, axis=0).astype("int16")
+            # Calculate resampling factors (e.g., 24kHz -> 16kHz is 2/3)
+            # This handles any input rate, not just 24kHz
+            try:
+                # Using 2 and 3 is specific to 24k -> 16k.
+                # A more general approach is needed if sample_rate is not 24k
+                # For this specific use case (Kokoro 24k), 2 and 3 is correct.
+                if sample_rate == KOKORO_SAMPLE_RATE:
+                    up = 2
+                    down = 3
+                else:
+                    # General case (though less efficient than GCD)
+                    up = self.asr_target_rate
+                    down = sample_rate
 
-            # Use the resampled data and the VOSK target rate
-            final_audio_data = resampled_data
-            final_sample_rate = VOSK_SAMPLE_RATE
+                resampled_data = resample_poly(data, up, down, axis=0).astype("int16")
+
+                final_audio_data = resampled_data
+                final_sample_rate = self.asr_target_rate
+            except Exception as e:
+                logger.error(f"Failed to resample audio: {e}")
+                return "Audio Resample Error"
         else:
+            # No resampling needed
             final_audio_data = data
             final_sample_rate = sample_rate
+        # --- END OF RESAMPLING LOGIC ---
 
-        # Initialize Vosk recognizer with the correct, expected sample rate (16000)
-        rec = KaldiRecognizer(self.vosk_model, final_sample_rate)
+        # --- NEW GROQ API CALL ---
 
-        # Vosk expects raw PCM 16-bit data, not the WAV container
-        rec.AcceptWaveform(final_audio_data.tobytes())
-
-        # Extract the final result and parse the text
-        result_json = rec.FinalResult()
-
+        # 1. Groq needs a file, not raw bytes. Re-package the 16kHz
+        #    numpy array back into WAV-formatted bytes.
         try:
-            import json
-
-            result = json.loads(result_json)
-            return result.get("text", "").strip()
+            resampled_buffer = io.BytesIO()
+            sf.write(
+                resampled_buffer,
+                final_audio_data,
+                final_sample_rate,  # This will be 16000
+                format="WAV",
+                subtype="PCM_16",
+            )
+            resampled_buffer.seek(0)  # Rewind the buffer to the beginning
         except Exception as e:
-            print(f"ERROR: Could not parse Vosk result: {e}")
+            logger.error(f"Failed to write resampled audio to buffer: {e}")
+            return "Audio Write Error"
+
+        # 2. Send the 16kHz WAV bytes to Groq
+        try:
+            start_time = time.time()
+            logger.info("Sending audio to Groq for transcription...")
+
+            transcription = self.groq_client.audio.transcriptions.create(
+                file=("input.wav", resampled_buffer.read()),
+                model=self.asr_model,
+                response_format="json",  # "json" for simple text, "verbose_json" for timestamps
+            )
+
+            end_time = time.time()
+            logger.info(f"Groq transcription finished in {end_time - start_time:.2f}s")
+
+            return transcription.text.strip()
+
+        except Exception as e:
+            logger.critical(f"Groq API transcription failed: {e}")
             return "Transcription Error"
