@@ -37,7 +37,6 @@ def render_interview_processing(application_controller):
             st.success("Interview Started!")
             st.session_state["interview_started"] = True
             st.session_state.current_page = "interview_page"
-            st.success("Returning to Home Page...")
             st.rerun()
 
     else:

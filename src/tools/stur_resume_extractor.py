@@ -38,7 +38,6 @@ class SturResumeExtractor:
             )
             logger.info("Successfully extracted resume data.")
 
-            print(response.personal_details)
             return response
         except Exception as e:
             print(e)

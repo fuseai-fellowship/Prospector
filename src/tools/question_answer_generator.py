@@ -54,12 +54,6 @@ class QuestionGenerator:
                 InterviewQuestionsSchema,
             )
             logger.info("Successfully Generated Interview Questions.")
-            print("Resume \n")
-            print(response.resume_questions)
-            print("JD \n")
-            print(response.jd_questions)
-            print("Mixed \n")
-            print(response.mixed_questions)
 
             return response
         except Exception as e:
