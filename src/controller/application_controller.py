@@ -11,7 +11,7 @@ from ..schemas.interview_questions_schema import InterviewQuestionsSchema, Quest
 from ..schemas.evaluation_schema import EvaluationScores
 
 from ..utils.db import db, create_user
-from ..utils.file_savings import save_processed_json_resume
+from ..utils.file_savings import save_processed_json_resume, save_interview_result
 
 
 session = db.get_session()
@@ -88,3 +88,14 @@ class ApplicationController:
         )
 
         return eval_reslt, followup
+
+    def interview_result_saver(self, applicant_number, active_jd, interview_jsons):
+        file_name = applicant_number + "_" + active_jd
+        save_interview_result(json_text=interview_jsons, file_name=file_name)
+
+    def get_overall_evaluation(self, evaluation_text: str) -> str:
+        overall_evaluation = self.evaluation_agent.get_overall_assessment(
+            evaluation_text=evaluation_text
+        )
+
+        return overall_evaluation

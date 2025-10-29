@@ -99,3 +99,8 @@ class AnswerEvaluationTool(BaseTool):
     async def _arun(self, user_answer, session_id: str):
         """Asynchronous execution"""
         return self._run(user_answer, session_id)
+
+    def overall_evaluation(self, evaluation_text):
+        prompt = f"You are a interviewer and given the context, write one brief sentence that summarizes the overall performance.. Return only that sentence, nothing else. {evaluation_text}"
+
+        return self._llm.invoke(prompt=prompt, add_to_history=False)

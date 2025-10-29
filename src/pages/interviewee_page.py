@@ -22,7 +22,7 @@ import os
 
 from ..utils.validator import Validator
 from ..controller.application_controller import ApplicationController
-from .interviewee.apply_job import apply_job
+from .interviewee_pages.apply_job import apply_job
 
 application_controller = ApplicationController()
 

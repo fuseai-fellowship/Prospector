@@ -8,7 +8,7 @@ db_url = "sqlite:///my_database.db"
 job_description_files = "data/jd_files"
 all_resumes_path = "data/applications/resumes"
 processed_json_resumes_path = "data/applications/processed_resumes"
-interview_result = "data/interviews"
+interview_result = "data/interview_results"
 
 [default.logging]
 log_level = "INFO"

@@ -50,3 +50,48 @@ def save_processed_json_resume(
 
     logger.info(f"Resume JSON saved to: {file_path}")
     return file_path
+
+
+def save_interview_result(json_text: str, file_name: str | None = None) -> str:
+    """
+    Save interview result to the configured path.
+    Accepts either a JSON string or plain text input.
+    Returns the relative path to the saved file.
+    """
+
+    # Get output directory from settings
+    output_dir = settings.get("interview_result")
+    if not output_dir:
+        raise ValueError("'interview_result' path not found in settings.")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Determine if content is JSON or plain text
+    try:
+        result_data = json.loads(json_text)
+        is_json = True
+    except json.JSONDecodeError:
+        result_data = json_text
+        is_json = False
+
+    # Sanitize filename
+    if not file_name:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_name = f"interview_result_{timestamp}"
+    else:
+        file_name = os.path.basename(file_name)
+        file_name = "".join(c for c in file_name if c not in r'\/:*?"<>|')
+
+    # Determine extension
+    extension = "json" if is_json else "txt"
+    file_path = os.path.join(output_dir, f"{file_name}.{extension}")
+    file_path = file_path.replace("\\", "/")
+
+    # Save file
+    with open(file_path, "w", encoding="utf-8") as f:
+        if is_json:
+            json.dump(result_data, f, ensure_ascii=False, indent=4)
+        else:
+            f.write(result_data)
+
+    logger.info(f"Interview result saved to: {file_path}")
+    return file_path

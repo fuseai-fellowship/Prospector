@@ -84,7 +84,7 @@ class LLMClient:
         Returns:
             String response from LLM
         """
-        if session_id & add_to_history:
+        if session_id and add_to_history:
             # Build prompt with conversation context
             full_prompt = self.history_manager.build_context_for_llm(
                 session_id=session_id, current_prompt=prompt, include_last_n=10
