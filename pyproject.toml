@@ -29,6 +29,7 @@ dependencies = [
     "soundfile>=0.13.1",
     "speechrecognition>=3.14.3",
     "streamlit>=1.50.0",
+    "streamlit-autorefresh>=1.0.1",
     "torch>=2.8.0",
     "unstructured[local-inference]>=0.18.15",
     "vosk>=0.3.45",

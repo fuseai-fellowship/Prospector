@@ -14,6 +14,9 @@ import sounddevice as sd
 import soundfile as sf
 import numpy as np
 
+# Import the autorefresh component
+from streamlit_autorefresh import st_autorefresh
+
 # Keep your relative imports as-is
 from ..controller.application_controller import ApplicationController
 from ..schemas.interview_questions_schema import QuestionItem, InterviewQuestionsSchema
@@ -47,6 +50,10 @@ class InterviewSession:
         self.all_questions_asked: List[QuestionItem] = []
         self.all_evaluations: List[EvaluationScores] = []
 
+        # --- Timer Constants ---
+        self.RECORD_DURATION = 120  # 2 minutes
+        self.EDIT_DURATION = 30  # 30 seconds
+
         # --- State for Threaded Recording ---
         self.recording_thread = None
         self.is_recording = False
@@ -55,7 +62,7 @@ class InterviewSession:
 
         # Load the speech service via the cached helper
         try:
-            with st.spinner("🔄 Loading speech models..."):
+            with st.spinner("Loading speech models..."):
                 self.speech_service = get_speech_service(cache_dir="speech_models")
             logger.info("SpeechService initialized.")
         except Exception as e:
@@ -126,23 +133,35 @@ class InterviewSession:
     # ASR: Wrapper around SpeechService
     # -----------------------------------
     def transcribe_audio(self, audio_data: np.ndarray, sample_rate: int = 16000) -> str:
-        """Transcribe audio to text using Vosk if available, else return None."""
+        """Transcribe audio to text using ASR if available, else return None."""
         if not self.speech_service:
-            st.error("ASR model not loaded (Vosk).")
+            st.error("ASR model not loaded.")
             return None
 
         try:
             audio_data = audio_data.flatten()
 
-            # Basic silence removal
-            threshold = 0.01
+            # Basic silence removal - with lower threshold
+            threshold = 0.005  # Lowered threshold
+            logger.debug(f"Original audio length: {len(audio_data)} samples")
             non_silent = np.abs(audio_data) > threshold
             if np.any(non_silent):
                 first_sound = np.argmax(non_silent)
                 last_sound = len(audio_data) - np.argmax(non_silent[::-1])
-                audio_data = audio_data[first_sound:last_sound]
+                trimmed_audio_data = audio_data[first_sound:last_sound]
+                logger.debug(
+                    f"Trimmed audio length: {len(trimmed_audio_data)} samples (Removed {len(audio_data) - len(trimmed_audio_data)} samples)"
+                )
+                if len(trimmed_audio_data) == 0:
+                    logger.warning(
+                        "Audio trimmed to zero length after silence removal."
+                    )
+                    return ""  # Return empty if trimming removed everything
+                audio_data = trimmed_audio_data  # Use the trimmed data
             else:
-                logger.warning("No audio detected above threshold.")
+                logger.warning(
+                    "No audio detected above threshold. Returning empty string."
+                )
                 return ""  # Return empty string if all silent
 
             # Write to in-memory buffer
@@ -159,7 +178,7 @@ class InterviewSession:
             return text
 
         except Exception as e:
-            logger.error(f"Transcription error (Vosk) wrapper: {e}", exc_info=True)
+            logger.error(f"Transcription error wrapper: {e}", exc_info=True)
             st.error(f"Transcription error: {e}")
             return None
 
@@ -172,14 +191,13 @@ class InterviewSession:
             import base64
 
             audio_base64 = base64.b64encode(audio_bytes).decode()
-
-            # Auto-play audio element
             audio_html = f"""
                 <audio autoplay style="display:none">
                     <source src="data:audio/wav;base64,{audio_base64}" type="audio/wav">
                 </audio>
             """
             st.markdown(audio_html, unsafe_allow_html=True)
+            logger.info("Audio autoplay element injected.")
         except Exception as e:
             logger.error(f"Error auto-playing audio: {e}")
 
@@ -193,18 +211,18 @@ class InterviewSession:
         Manages the state machine for a single question.
         Returns: (question_with_answer, evaluation, follow_up_question) on completion.
         """
+        audio_initially_played_key = f"audio_initially_played_{question.id}"  # Flag key
 
-        # 1. Prepare TTS audio (get from cache or generate)
+        # 1. Prepare TTS audio
         audio_bytes = self._prepare_question_audio(question)
 
-        # 2. Render UI
+        # 2. Render UI Columns
         col_question, col_answer = st.columns([1, 1], gap="large")
         with col_question:
             self._render_question_ui(question, audio_bytes)
 
         with col_answer:
             # --- This is the core state machine ---
-
             if not st.session_state.get(f"submitted_{question.id}"):
                 if not st.session_state.get(f"recorded_{question.id}"):
                     # State 1: Ready to record
@@ -216,24 +234,37 @@ class InterviewSession:
                 # State 3: Submitted, handle evaluation
                 return self._handle_evaluation(question, jd, session_id)
 
+        # 3. Auto-play audio *after* UI columns are rendered
+        if audio_bytes and not st.session_state.get(f"audio_played_{question.id}"):
+            # Check if we haven't already tried playing and set the flag
+            if not st.session_state.get(audio_initially_played_key, False):
+                self.auto_play_audio(audio_bytes)
+                st.session_state[f"audio_played_{question.id}"] = True
+                time.sleep(2)  # Keep the 2-second pause for audio to start
+                # Set the flag indicating initial playback attempt is done
+                st.session_state[audio_initially_played_key] = True
+                logger.info(
+                    f"Audio playback initiated for Q {question.id}, setting flag."
+                )
+                # **REMOVED st.rerun() HERE** - Let the next natural/autorefresh rerun occur
+
         # Default return if question is not yet complete
         return None, None, None
 
-    # -----------------------------------
-    # Question Flow: Helper Modules
-    # -----------------------------------
-
+    # ... (_prepare_question_audio, _render_question_ui methods remain the same) ...
     def _prepare_question_audio(self, question: QuestionItem) -> bytes | None:
         """Generates or retrieves cached TTS audio bytes."""
         audio_bytes_key = f"audio_bytes_{question.id}"
 
         if audio_bytes_key not in st.session_state:
-            with st.spinner("⏳ Preparing question..."):
+            with st.spinner("Preparing question..."):
                 audio_bytes = self.text_to_speech(question.question, voice="af_bella")
                 if audio_bytes:
                     st.session_state[audio_bytes_key] = audio_bytes
                     st.session_state[f"audio_generated_{question.id}"] = True
                     st.session_state[f"audio_played_{question.id}"] = False
+                    # Initialize the new flag
+                    st.session_state[f"audio_initially_played_{question.id}"] = False
                 else:
                     st.session_state[audio_bytes_key] = None  # Cache failure
 
@@ -241,44 +272,82 @@ class InterviewSession:
 
     def _render_question_ui(self, question: QuestionItem, audio_bytes: bytes | None):
         """Renders the left column with the question and audio player."""
-
-        # Auto-play audio once
-        if audio_bytes and not st.session_state.get(f"audio_played_{question.id}"):
-            self.auto_play_audio(audio_bytes)
-            st.session_state[f"audio_played_{question.id}"] = True
-            time.sleep(1)  # Brief pause
+        # --- REMOVED AUTOPLAY LOGIC FROM HERE ---
 
         # Header with question metadata
         st.markdown(
-            f"**Question #{question.id}** | 📊 *{question.difficulty}* | 🎯 *{', '.join(question.target_concepts[:2])}...*"
+            f"**Question #{question.id}** | *{question.difficulty}* | *{', '.join(question.target_concepts[:2])}...*"
         )
         st.markdown("---")
 
         with st.container(border=True):
             st.markdown("### Interview Question")
 
+            # Display the audio player, but don't autoplay here
             if audio_bytes:
                 st.audio(audio_bytes, format="audio/wav")
             else:
-                st.warning("⚠️ Audio not available")
+                st.warning("Audio not available")
 
-            with st.expander("📝 View Question Text (if needed)"):
+            with st.expander("View Question Text (if needed)"):
                 st.markdown(question.question)
                 st.caption(
                     f"**Target Concepts:** {', '.join(question.target_concepts)}"
                 )
 
+    # ... (_stop_and_process_recording method remains the same) ...
+    def _stop_and_process_recording(self, question: QuestionItem):
+        """Helper to stop recording, process, and transcribe audio."""
+        logger.info(f"Stopping recording for question {question.id}")
+        # 1. Stop the thread
+        self.stop_recording()
+        if self.recording_thread:
+            self.recording_thread.join()  # Wait for thread to finish
+
+        # 2. Get frames
+        audio_frames = self.recorded_audio_frames
+
+        if audio_frames and len(audio_frames) > 0:
+            # 3. Process audio
+            audio_data = np.concatenate(audio_frames, axis=0)
+            st.session_state[f"audio_data_{question.id}"] = audio_data.flatten()
+            st.session_state[f"recorded_{question.id}"] = True
+            st.success("Recording complete!")
+
+            # 4. Transcribe
+            with st.spinner("Transcribing your answer..."):
+                answer_text = self.transcribe_audio(
+                    st.session_state[f"audio_data_{question.id}"]
+                )
+
+            if answer_text is not None:
+                st.session_state[f"answer_{question.id}"] = answer_text
+            else:
+                st.error("Transcription failed. Please try again.")
+                st.session_state[f"recorded_{question.id}"] = False
+        else:
+            # Handle case where user stopped without recording, or time ran out
+            st.warning("No audio was recorded. Moving to review.")
+            st.session_state[f"audio_data_{question.id}"] = np.array([], dtype=np.int16)
+            st.session_state[f"recorded_{question.id}"] = True
+            st.session_state[f"answer_{question.id}"] = ""  # Empty answer
+
     def _render_answer_recorder(self, question: QuestionItem):
-        """Renders the right column for recording (Start/Stop)."""
+        """Renders the right column for recording (Start/Stop) with a 2-min timer."""
         with st.container(border=True):
-            st.markdown("### 🎙️ Your Answer")
+            st.markdown("### Your Answer")
 
             is_recording_active = st.session_state.get(
                 f"recording_active_{question.id}", False
             )
 
+            # Placeholder for the timer
+            timer_placeholder = st.empty()
+
             if not is_recording_active:
-                st.info("Click 'Start Recording' when ready to answer")
+                st.info(
+                    f"You have {self.RECORD_DURATION // 60} minutes to answer. Click 'Start Recording' when ready."
+                )
                 if st.button(
                     "Start Recording",
                     key=f"record_{question.id}",
@@ -286,96 +355,135 @@ class InterviewSession:
                     use_container_width=True,
                 ):
                     st.session_state[f"recording_active_{question.id}"] = True
+                    st.session_state[f"record_start_time_{question.id}"] = time.time()
                     # Start the recording thread
                     self.recording_thread = threading.Thread(target=self.record_audio)
                     self.recording_thread.start()
-                    st.rerun()
+                    # st.rerun() # <-- REMOVED: This caused the double-render bug
             else:
-                st.spinner("🎙️ Recording in progress...")
+                # --- RECORDING IS ACTIVE ---
+                start_time = st.session_state.get(
+                    f"record_start_time_{question.id}", time.time()
+                )
+                elapsed_time = time.time() - start_time
+                remaining_time = self.RECORD_DURATION - elapsed_time
 
-                if st.button(
-                    "⏹️ Stop Recording",
-                    key=f"stop_recording_{question.id}",
-                    use_container_width=True,
-                ):
-                    # 1. Stop the thread
-                    self.stop_recording()
-                    if self.recording_thread:
-                        self.recording_thread.join()  # Wait for thread to finish
+                if remaining_time > 0:
+                    # Update timer display
+                    minutes, seconds = divmod(int(remaining_time), 60)
+                    timer_placeholder.metric(
+                        "Recording Time Remaining", f"{minutes:02d}:{seconds:02d}"
+                    )
+                    st.progress(remaining_time / self.RECORD_DURATION)
 
-                    # 2. Get frames
-                    audio_frames = self.recorded_audio_frames
+                    if st.button(
+                        "Stop Recording",
+                        key=f"stop_recording_{question.id}",
+                        use_container_width=True,
+                    ):
+                        with st.spinner("Processing audio..."):
+                            self._stop_and_process_recording(question)
+                        st.rerun()
 
-                    if audio_frames and len(audio_frames) > 0:
-                        # 3. Process audio
-                        audio_data = np.concatenate(audio_frames, axis=0)
-                        st.session_state[f"audio_data_{question.id}"] = (
-                            audio_data.flatten()
-                        )
-                        st.session_state[f"recorded_{question.id}"] = True
-                        st.success("✅ Recording complete!")
+                    # Force rerun to update timer
+                    time.sleep(1)
+                    st.rerun()
 
-                        # 4. Transcribe
-                        with st.spinner("📝 Transcribing your answer..."):
-                            answer_text = self.transcribe_audio(
-                                st.session_state[f"audio_data_{question.id}"]
-                            )
-
-                        if answer_text is not None:
-                            st.session_state[f"answer_{question.id}"] = answer_text
-                        else:
-                            st.error("❌ Transcription failed. Please try again.")
-                            st.session_state[f"recorded_{question.id}"] = False
-
-                    else:
-                        st.error("❌ Recording failed or was empty. Please try again.")
-
-                    st.session_state[f"recording_active_{question.id}"] = False
+                else:
+                    # --- TIME'S UP ---
+                    timer_placeholder.error("Time's up! Stopping recording...")
+                    with st.spinner("Time's up! Processing audio..."):
+                        self._stop_and_process_recording(question)
+                    time.sleep(2)  # Give user time to see message
                     st.rerun()
 
     def _render_answer_review(self, question: QuestionItem):
-        """Renders the right column for reviewing/submitting the answer."""
+        """
+        Renders the right column for reviewing/submitting the answer with a 30s timer.
+        Uses st_autorefresh for the countdown.
+        """
+        review_start_key = f"review_start_time_{question.id}"
+        audio_initially_played_key = (
+            f"audio_initially_played_{question.id}"  # Need flag here too
+        )
+
+        if review_start_key not in st.session_state:
+            st.session_state[review_start_key] = time.time()
+            logger.info(f"Review timer started for Q {question.id}")
+
+        start_time = st.session_state.get(review_start_key, time.time())
+        elapsed_time = time.time() - start_time
+        remaining_time = self.EDIT_DURATION - elapsed_time
+
         with st.container(border=True):
-            st.markdown("### 🎙️ Your Answer")
-            st.success("✅ Answer recorded and transcribed")
+            st.markdown("### Your Answer")
+            st.success("Answer recorded and transcribed")
 
+            timer_placeholder = st.empty()
             answer_text = st.session_state.get(f"answer_{question.id}", "")
-
             edited_answer = st.text_area(
-                "Review and edit your answer if needed:",
+                f"Review and edit your answer. You have {self.EDIT_DURATION} seconds.",
                 value=answer_text,
                 height=200,
                 key=f"edit_{question.id}",
             )
-
             st.markdown("---")
             col_submit1, col_submit2 = st.columns([1, 1])
 
-            with col_submit1:
-                if st.button(
-                    "✅ Submit Answer",
-                    key=f"submit_{question.id}",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    st.session_state[f"submitted_{question.id}"] = True
-                    st.session_state[f"final_answer_{question.id}"] = edited_answer
-                    st.rerun()
+            if remaining_time > 0:
+                minutes, seconds = divmod(int(remaining_time), 60)
+                timer_placeholder.info(f"Time to review: {seconds}s remaining")
+                st.progress(remaining_time / self.EDIT_DURATION)
 
-            with col_submit2:
-                if st.button(
-                    "🔄 Re-record",
-                    key=f"rerecord_{question.id}",
-                    use_container_width=True,
-                ):
-                    # Clear only this question's recording state
-                    _clear_question_audio_state(question.id)
-                    st.rerun()
+                # **MODIFIED:** Only start autorefresh if the initial audio playback sequence is done
+                # (This assumes the flag is set during the recording phase and persists)
+                if st.session_state.get(audio_initially_played_key, False):
+                    st_autorefresh(
+                        interval=1000,
+                        limit=int(remaining_time) + 1,
+                        key=f"review_refresher_{question.id}",
+                    )
+                # --- End modification ---
+
+                with col_submit1:
+                    if st.button(
+                        "Submit Answer",
+                        key=f"submit_{question.id}",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        self._submit_answer(question, edited_answer)
+                        st.rerun()
+                        return
+
+                with col_submit2:
+                    if st.button(
+                        "Re-record",
+                        key=f"rerecord_{question.id}",
+                        use_container_width=True,
+                    ):
+                        _clear_question_audio_state(question.id)
+                        st.rerun()
+                        return
+
+            else:  # Time's up
+                timer_placeholder.error("Time's up! Submitting answer...")
+                self._submit_answer(question, edited_answer)
+                time.sleep(2)  # Pause to show message
+                st.rerun()  # Force transition to evaluation
+
+    # ... (_submit_answer, _handle_evaluation, display_evaluation, save_interview_results methods remain the same) ...
+    def _submit_answer(self, question: QuestionItem, final_answer_text: str):
+        """Helper to submit the final answer."""
+        logger.info(f"Submitting answer for question {question.id}")
+        st.session_state[f"submitted_{question.id}"] = True
+        st.session_state[f"final_answer_{question.id}"] = final_answer_text
+        if f"review_start_time_{question.id}" in st.session_state:
+            del st.session_state[f"review_start_time_{question.id}"]
 
     def _handle_evaluation(self, question: QuestionItem, jd: str, session_id: str):
         """Handles the evaluation phase and returns final data."""
 
-        # Run evaluation only once
         if not st.session_state.get(f"evaluated_{question.id}"):
             final_answer = st.session_state.get(f"final_answer_{question.id}", "")
             question.answer = final_answer
@@ -384,13 +492,11 @@ class InterviewSession:
                 evaluation, follow_up = self.controller.evaluate_answer(
                     user_answer=question, jd=jd, session_id=session_id
                 )
-
             st.session_state[f"evaluated_{question.id}"] = True
             st.session_state[f"evaluation_{question.id}"] = evaluation
             st.session_state[f"followup_{question.id}"] = follow_up
             st.rerun()
 
-        # Display cached evaluation
         evaluation = st.session_state.get(f"evaluation_{question.id}")
         follow_up = st.session_state.get(f"followup_{question.id}")
         final_answer = st.session_state.get(f"final_answer_{question.id}", "")
@@ -398,7 +504,6 @@ class InterviewSession:
         if evaluation:
             self.display_evaluation(evaluation)
 
-        # This is the terminal state. Return the results.
         question.answer = final_answer
         return question, evaluation, follow_up
 
@@ -408,7 +513,7 @@ class InterviewSession:
     def display_evaluation(self, evaluation):
         """Display evaluation scores in a professional format"""
         st.markdown("---")
-        st.markdown("### 📊 Evaluation Results")
+        st.markdown("### Evaluation Results")
 
         if not evaluation:
             st.error("Evaluation data not found.")
@@ -416,11 +521,9 @@ class InterviewSession:
 
         scores = getattr(evaluation, "scores", None)
         if scores is None:
-            # Handle case where evaluation might be just the scores object
             scores = evaluation
 
         follow_up_status = getattr(evaluation, "follow_up_status", False)
-
         col1, col2, col3, col4, col5 = st.columns(5)
 
         def get_score(score_name):
@@ -450,9 +553,9 @@ class InterviewSession:
         st.markdown(f"**Overall Score: {percentage:.1f}%**")
 
         if follow_up_status:
-            st.warning("🔄 A follow-up question will be asked to clarify your answer.")
+            st.warning("A follow-up question will be asked to clarify your answer.")
         else:
-            st.success("✅ Moving to next question...")
+            st.success("Moving to next question...")
 
     # --------------------------
     # Save interview results
@@ -476,7 +579,6 @@ class InterviewSession:
             for eval_item, q in zip(self.all_evaluations, self.all_questions_asked):
                 if not eval_item:
                     continue
-
                 scores = getattr(eval_item, "scores", eval_item)
 
                 def get_score(s, name):
@@ -541,21 +643,33 @@ def _clear_question_audio_state(question_id):
         f"recorded_{question_id}",
         f"audio_data_{question_id}",
         f"answer_{question_id}",
+        f"answer_timer_start_{question_id}",
+        f"user_is_recording_{question_id}",
+        f"review_start_time_{question_id}",
+        f"audio_initially_played_{question_id}",  # Clear the new flag
     ]
     for key in keys_to_delete:
         if key in st.session_state:
             del st.session_state[key]
 
 
+# ... (_clear_question_flow_state, render, display_completion_page functions remain unchanged) ...
 def _clear_question_flow_state(question_id):
     """Clears all session state for a given question ID."""
     keys_to_delete = []
     for key in st.session_state.keys():
         if str(question_id) in key:
             keys_to_delete.append(key)
+        # Also clean up refresh keys if they exist
+        if (
+            key == f"record_refresher_{question_id}"
+            or key == f"review_refresher_{question_id}"
+        ):
+            keys_to_delete.append(key)
 
     for key in keys_to_delete:
-        del st.session_state[key]
+        if key in st.session_state:  # Check existence before deleting
+            del st.session_state[key]
 
 
 # ---------------- Main Render Function ----------------
@@ -564,9 +678,9 @@ def render():
 
     if not st.session_state.get("interview_started"):
         st.warning(
-            "⚠️ Interview has not been started. Please go back to the application page."
+            "Interview has not been started. Please go back to the application page."
         )
-        if st.button("🏠 Go Home"):
+        if st.button("Go Home"):
             st.session_state.current_page = "home"
             st.rerun()
         return
@@ -583,9 +697,9 @@ def render():
     if "interview_completed" not in st.session_state:
         st.session_state.interview_completed = False
 
-    st.title("🎯 AI-Powered Interview")
+    st.title("AI-Powered Interview")
     st.markdown(
-        "*Please answer each question clearly and professionally. Speak slowly and clearly to ensure accurate transcription.*"
+        "*Please answer each question clearly and professionally. The 2-minute answer timer will begin immediately.*"
     )
 
     controller = ApplicationController()
@@ -594,10 +708,8 @@ def render():
     final_application_info = st.session_state.get("final_application_info")
 
     if not active_jd or not final_application_info:
-        st.error(
-            "❌ Missing required information. Please complete the application first."
-        )
-        if st.button("🔙 Go Back"):
+        st.error("Missing required information. Please complete the application first.")
+        if st.button("Go Back"):
             st.session_state.interview_started = False
             st.session_state.current_page = "interview"
             st.rerun()
@@ -605,7 +717,7 @@ def render():
 
     # Prepare interview questions (only once)
     if not st.session_state.interview_questions_prepared:
-        with st.spinner("⏳ Preparing your interview..."):
+        with st.spinner("Preparing your interview..."):
             try:
                 resume_json = final_application_info.model_dump_json()
                 interview_questions = controller.prepeare_interview_questions(
@@ -616,14 +728,12 @@ def render():
                 st.session_state.interview_questions_prepared = True
                 st.session_state.interview_session = InterviewSession(controller)
 
-                st.success(
-                    "✅ Interview ready! First question will play automatically..."
-                )
+                st.success("Interview ready! First question will play automatically...")
                 time.sleep(2)
                 st.rerun()
 
             except Exception as e:
-                st.error(f"❌ Error preparing interview questions: {e}")
+                st.error(f"Error preparing interview questions: {e}")
                 logger.error(f"Interview preparation error: {e}", exc_info=True)
                 return
 
@@ -637,16 +747,16 @@ def render():
 
     if not interview_session or not interview_session.speech_service:
         st.error(
-            "❌ Interview session or SpeechService failed to initialize. Please reload."
+            "Interview session or SpeechService failed to initialize. Please reload."
         )
         if st.button("Reload"):
             st.rerun()
         return
 
     categories = [
-        ("resume_questions", "📝 Resume-Based Questions"),
-        ("jd_questions", "💼 Job Description Questions"),
-        ("mixed_questions", "🔀 Mixed Questions"),
+        ("resume_questions", "Resume-Based Questions"),
+        ("jd_questions", "Job Description Questions"),
+        ("mixed_questions", "Mixed Questions"),
     ]
 
     current_cat_index = st.session_state.current_category_index
@@ -663,8 +773,7 @@ def render():
     total_base_questions = sum(
         len(getattr(interview_questions, cat[0], [])) for cat in categories
     )
-    # Note: total_questions_so_far is harder to track with follow-ups,
-    # so we'll just track based on base questions.
+
     progress_val = (current_cat_index / len(categories)) + (
         st.session_state.current_question_in_category
         / (len(question_list) * len(categories))
@@ -683,7 +792,7 @@ def render():
         # Move to next category
         st.session_state.current_category_index += 1
         st.session_state.current_question_in_category = 0
-        st.success(f"✅ {category_name} completed! Moving to next section...")
+        st.success(f"{category_name} completed! Moving to next section...")
         time.sleep(2)
         st.rerun()
         return
@@ -706,8 +815,7 @@ def render():
         interview_session.all_evaluations.append(evaluation)
 
         if follow_up:
-            st.info("🔄 Follow-up question based on your answer...")
-            # Insert follow-up *after* the current question
+            st.info("Follow-up question based on your answer...")
             question_list.insert(current_q_index + 1, follow_up)
             setattr(interview_questions, category_key, question_list)
             st.session_state.interview_questions = interview_questions
@@ -719,14 +827,13 @@ def render():
         st.session_state.current_question_in_category += 1
         st.session_state.interview_session = interview_session  # Save session
 
-        time.sleep(2)  # Pause to show evaluation
+        time.sleep(3)  # Pause to show evaluation
         st.rerun()
 
 
 def display_completion_page():
     """Display interview completion summary"""
-    st.success("🎉 Interview Completed!")
-    st.balloons()
+    st.success("Interview Completed!")
 
     interview_session = st.session_state.get("interview_session")
     if not interview_session:
@@ -738,19 +845,24 @@ def display_completion_page():
     for eval_item in interview_session.all_evaluations:
         if not eval_item:
             continue
-
         scores = getattr(eval_item, "scores", eval_item)
         if not scores:
             continue
-
+        scores_dict = {}
+        if hasattr(scores, "model_dump"):
+            scores_dict = scores.model_dump()
+        elif isinstance(scores, dict):
+            scores_dict = scores
+        elif hasattr(scores, "__dict__"):
+            scores_dict = scores.__dict__
         total_score += sum(
-            val for val in scores.__dict__.values() if isinstance(val, (int, float))
+            val for val in scores_dict.values() if isinstance(val, (int, float))
         )
         max_score += 50  # 5 categories, 10 points each
 
     percentage = (total_score / max_score * 100) if max_score > 0 else 0
 
-    st.markdown("## 📊 Interview Summary")
+    st.markdown("## Interview Summary")
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -761,15 +873,15 @@ def display_completion_page():
         st.metric("Percentage", f"{percentage:.1f}%")
 
     if percentage >= 80:
-        st.success("🌟 Excellent Performance!")
+        st.success("Excellent Performance!")
     elif percentage >= 60:
-        st.info("👍 Good Performance!")
+        st.info("Good Performance!")
     elif percentage >= 40:
-        st.warning("⚠️ Average Performance")
+        st.warning("Average Performance")
     else:
-        st.error("📉 Needs Improvement")
+        st.error("Needs Improvement")
 
-    if st.button("💾 Save Results", type="primary"):
+    if st.button("Save Results", type="primary"):
         if not st.session_state.final_application_info:
             st.error("Final application info not found. Cannot save.")
             return
@@ -787,12 +899,12 @@ def display_completion_page():
         )
 
         if filepath:
-            st.success(f"✅ Results saved successfully to: {filepath}")
+            st.success(f"Results saved successfully to: {filepath}")
         else:
-            st.error("❌ Failed to save results")
+            st.error("Failed to save results")
 
     st.markdown("---")
-    if st.button("🏠 Return Home"):
+    if st.button("Return Home"):
         # Clean up all session state
         keys_to_clear = [
             "interview_session",
@@ -808,13 +920,20 @@ def display_completion_page():
         ]
 
         for key in list(st.session_state.keys()):
+            # Check for main keys or any dynamic question-specific keys
             if (
                 key in keys_to_clear
                 or "audio_" in key
                 or "answer_" in key
                 or "recorded_" in key
+                or "evaluated_" in key
+                or "submitted_" in key
+                or "_start_time_" in key
+                or "user_is_recording_" in key
+                or "refresher_" in key  # Clean up autorefresh keys
             ):
-                del st.session_state[key]
+                if key in st.session_state:
+                    del st.session_state[key]
 
         st.session_state.current_page = "home"
         st.rerun()
