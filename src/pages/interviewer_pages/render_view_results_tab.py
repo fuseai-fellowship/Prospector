@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 from configs.config import settings
 from configs.config import logger
-import traceback
 
 # Get the path from settings
 INTERVIEW_RESULT_PATH = settings.get("interview_result", "data/interviews")

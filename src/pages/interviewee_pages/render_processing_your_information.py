@@ -27,8 +27,7 @@ def render_interview_processing(application_controller):
                 Before you begin, please review the following instructions carefully:
                 
                 - You’ll be asked **several questions** based on your resume and the job description.
-                - You have a **maximum of 2 minutes** to speak your answer.
-                - After speaking, you’ll get **1 minute to edit** or refine your response.
+                - You have a to press start recording to speak your answer onces finished stop recording.
                 - Please answer in **English** and maintain **professional integrity** — this simulates a real interview.
                 - Ensure your **microphone and internet** are working properly before you begin.
                 """)

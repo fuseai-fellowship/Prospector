@@ -26,14 +26,14 @@ class ApplicationController:
         pass
 
     def process_applicant_info(self, resume_file_path) -> ResumeSchema:
-        # result = self.resume_processor.run_extraction_pipline(
-        #     resume_file=resume_file_path
-        # )
+        result = self.resume_processor.run_extraction_pipline(
+            resume_file=resume_file_path
+        )
         # Save result as JSON
         # Example usage
-        result = self.load_resume_as_schema(
-            "data/applications/processed_resumes/_SandeshShrestha_CV (1).json"
-        )
+        # result = self.load_resume_as_schema(
+        #     "data/applications/processed_resumes/_SandeshShrestha_CV (1).json"
+        # )
 
         return result
 

@@ -97,7 +97,7 @@ class LLMClient:
         response_content = getattr(response, "content", str(response))
 
         # Save to history if session_id provided
-        if session_id & add_to_history:
+        if session_id and add_to_history:
             self.history_manager.add_user_message(session_id, prompt, metadata=metadata)
             self.history_manager.add_assistant_message(
                 session_id, response_content, metadata=metadata
