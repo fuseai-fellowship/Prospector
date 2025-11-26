@@ -24,6 +24,7 @@ dependencies = [
     "pydantic[email]>=2.11.9",
     "pydub>=0.25.1",
     "scipy>=1.16.2",
+    "sentence-transformers>=5.1.2",
     "sentencepiece>=0.2.1",
     "sounddevice>=0.5.3",
     "soundfile>=0.13.1",
